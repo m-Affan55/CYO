@@ -21,7 +21,7 @@ class GameLobbyScreen extends StatelessWidget {
           child: Column(
             children: [
               Text(
-                'Friday Chaos',
+                'Friday Night CYO',
                 style: Theme.of(context).textTheme.displayMedium,
               ),
               const SizedBox(height: 8),

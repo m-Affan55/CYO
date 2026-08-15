@@ -46,16 +46,19 @@ class WelcomeScreen extends StatelessWidget {
               // App Title
               Center(
                 child: Text(
-                  'REVEAL',
-                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                    letterSpacing: 2,
+                  'CYO',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 8,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
               ),
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'PARTY GAME',
+                  'CALL YOU OUT',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     letterSpacing: 4,
                     color: AppTheme.textSecondary,

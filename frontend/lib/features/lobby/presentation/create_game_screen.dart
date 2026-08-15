@@ -11,12 +11,13 @@ class CreateGameScreen extends StatefulWidget {
 }
 
 class _CreateGameScreenState extends State<CreateGameScreen> {
-  final TextEditingController _gameNameController = TextEditingController(text: 'Friday Chaos');
-  double _maxPlayers = 6;
+  final TextEditingController _gameNameController = TextEditingController(text: 'Friday Night CYO');
+  int _maxPlayers = 6;
   int _selectedRounds = 5;
-  bool _voteTimerEnabled = true;
+  int _selectedTimer = 30; // Max 30 seconds
 
   final List<int> _roundOptions = [3, 5, 7, 10];
+  final List<int> _timerOptions = [15, 20, 30];
 
   @override
   void dispose() {
@@ -80,7 +81,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Max Players Slider
+              // Max Players Counter
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -91,38 +92,46 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                       letterSpacing: 1.5,
                     ),
                   ),
-                  Text(
-                    '${_maxPlayers.toInt()}',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (_maxPlayers > 3) setState(() => _maxPlayers--);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceCharcoal,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF2A2A2A)),
+                          ),
+                          child: const Icon(Icons.remove, size: 20, color: AppTheme.textPrimary),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '$_maxPlayers',
+                        style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                          color: AppTheme.primaryRed,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () {
+                          if (_maxPlayers < 12) setState(() => _maxPlayers++);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceCharcoal,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF2A2A2A)),
+                          ),
+                          child: const Icon(Icons.add, size: 20, color: AppTheme.textPrimary),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SliderTheme(
-                data: SliderThemeData(
-                  activeTrackColor: AppTheme.primaryRed,
-                  inactiveTrackColor: AppTheme.textPrimary,
-                  thumbColor: AppTheme.textPrimary,
-                  overlayColor: AppTheme.primaryRed.withOpacity(0.2),
-                  trackHeight: 4,
-                ),
-                child: Slider(
-                  value: _maxPlayers,
-                  min: 3,
-                  max: 12,
-                  divisions: 9,
-                  onChanged: (value) {
-                    setState(() {
-                      _maxPlayers = value;
-                    });
-                  },
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('3', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.textMuted)),
-                  Text('12', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.textMuted)),
                 ],
               ),
               const SizedBox(height: 32),
@@ -170,39 +179,48 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Vote Timer Toggle
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceCharcoal,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF2A2A2A)),
+              // Vote Timer
+              Text(
+                'VOTE TIMER',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppTheme.textSecondary,
+                  letterSpacing: 1.5,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Vote Timer', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text('60 seconds per round', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted)),
-                      ],
-                    ),
-                    Switch(
-                      value: _voteTimerEnabled,
-                      activeColor: AppTheme.textPrimary,
-                      activeTrackColor: AppTheme.primaryRed,
-                      inactiveThumbColor: AppTheme.textMuted,
-                      inactiveTrackColor: AppTheme.backgroundBlack,
-                      onChanged: (value) {
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: _timerOptions.map((timer) {
+                  final isSelected = _selectedTimer == timer;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
                         setState(() {
-                          _voteTimerEnabled = value;
+                          _selectedTimer = timer;
                         });
                       },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppTheme.primaryRed.withOpacity(0.1) : AppTheme.surfaceCharcoal,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isSelected ? AppTheme.primaryRed : const Color(0xFF2A2A2A)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${timer}s',
+                            style: TextStyle(
+                              color: isSelected ? AppTheme.primaryRed : AppTheme.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 48),
 
@@ -210,7 +228,6 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
               PrimaryButton(
                 text: 'Continue – Invite Friends',
                 onPressed: () {
-                  // TODO: Implement actual game creation logic on backend
                   context.push('/game-lobby');
                 },
               ),
