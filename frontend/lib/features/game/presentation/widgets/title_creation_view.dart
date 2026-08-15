@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
@@ -15,6 +17,51 @@ class _TitleCreationViewState extends State<TitleCreationView> {
   final TextEditingController _controller = TextEditingController();
   final List<String> _titles = [];
   final int _minTitles = 6;
+  
+  // Mock Live Activity
+  Timer? _mockTimer;
+  String _liveActivityText = '';
+  final List<String> _mockFriends = ['Sarah', 'Mike', 'Ali', 'Jess'];
+
+  @override
+  void initState() {
+    super.initState();
+    _startMockLiveActivity();
+  }
+
+  void _startMockLiveActivity() {
+    _mockTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted) return;
+      if (_titles.length >= _minTitles) {
+        timer.cancel();
+        setState(() {
+          _liveActivityText = '';
+        });
+        return;
+      }
+
+      final friend = _mockFriends[Random().nextInt(_mockFriends.length)];
+      
+      setState(() {
+        _liveActivityText = '$friend is typing a title...';
+      });
+
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        setState(() {
+          _liveActivityText = '$friend added a title!';
+          _titles.add('Hidden Title (by $friend)');
+        });
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _mockTimer?.cancel();
+    super.dispose();
+  }
 
   void _addTitle() {
     if (_controller.text.trim().isNotEmpty) {
@@ -56,7 +103,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
               child: TextField(
                 controller: _controller,
                 decoration: InputDecoration(
-                  hintText: 'E.g., "Always Late", "Code Wizard"',
+                  hintText: 'E.g., "Always Late"',
                   filled: true,
                   fillColor: AppTheme.surfaceCharcoal,
                   border: OutlineInputBorder(
@@ -90,7 +137,36 @@ class _TitleCreationViewState extends State<TitleCreationView> {
             )
           ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
+
+        // Live Activity Indicator
+        AnimatedOpacity(
+          opacity: _liveActivityText.isNotEmpty ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: Row(
+            children: [
+              if (_liveActivityText.contains('typing')) ...[
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.textMuted),
+                ),
+                const SizedBox(width: 8),
+              ] else if (_liveActivityText.contains('added')) ...[
+                const Icon(Icons.check_circle, color: AppTheme.successGreen, size: 14),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                _liveActivityText,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: _liveActivityText.contains('typing') ? AppTheme.textMuted : AppTheme.successGreen,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         
         // Progress
         Row(
