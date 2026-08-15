@@ -26,8 +26,9 @@ class _OnlineMultiplayerScreenState extends ConsumerState<OnlineMultiplayerScree
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -134,6 +135,7 @@ class _OnlineMultiplayerScreenState extends ConsumerState<OnlineMultiplayerScree
             ],
           ),
         ),
+      ),
       ),
     );
   }
