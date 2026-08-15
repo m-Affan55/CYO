@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/providers/game_provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -107,19 +108,31 @@ class GameLobbyScreen extends ConsumerWidget {
               ),
               
               // Buttons
-              PrimaryButton(
-                text: 'Start Game',
-                onPressed: () {
-                  final ws = ref.read(webSocketServiceProvider);
-                  ws.sendAction('START_GAME');
-                  context.push('/in-game', extra: {'isSecretMode': isSecretMode});
-                },
-              ),
+              Builder(builder: (context) {
+                final bool canStart = gameState.players.length >= 3;
+                return PrimaryButton(
+                  text: canStart ? 'Start Game' : 'Need 3 Players',
+                  onPressed: canStart ? () {
+                    final ws = ref.read(webSocketServiceProvider);
+                    ws.sendAction('START_GAME');
+                    context.push('/in-game', extra: {'isSecretMode': isSecretMode});
+                  } : () {},
+                  color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
+                );
+              }),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    final code = gameState.roomCode;
+                    if (code.isNotEmpty) {
+                      Clipboard.setData(ClipboardData(text: 'Join my CYO game! Code: $code'));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invite code copied to clipboard!')),
+                      );
+                    }
+                  },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.textPrimary,
                     side: const BorderSide(color: Color(0xFF2A2A2A)),
