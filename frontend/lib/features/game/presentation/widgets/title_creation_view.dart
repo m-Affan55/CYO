@@ -22,6 +22,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
   Timer? _mockTimer;
   String _liveActivityText = '';
   final List<String> _mockFriends = ['Sarah', 'Mike', 'Ali', 'Jess'];
+  final List<String> _mockTitles = ['Drama Queen', 'Gym Rat', 'Main Character', 'The Ghost', 'Overthinker'];
 
   @override
   void initState() {
@@ -41,6 +42,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
       }
 
       final friend = _mockFriends[Random().nextInt(_mockFriends.length)];
+      final randomTitle = _mockTitles[Random().nextInt(_mockTitles.length)];
       
       setState(() {
         _liveActivityText = '$friend is typing a title...';
@@ -50,7 +52,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
         if (!mounted) return;
         setState(() {
           _liveActivityText = '$friend added a title!';
-          _titles.add('Hidden Title (by $friend)');
+          _titles.add('"$randomTitle" (by $friend)');
         });
       });
     });

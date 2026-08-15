@@ -4,7 +4,9 @@ import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
 
 class GameLobbyScreen extends StatelessWidget {
-  const GameLobbyScreen({super.key});
+  final bool isSecretMode;
+
+  const GameLobbyScreen({super.key, required this.isSecretMode});
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +103,7 @@ class GameLobbyScreen extends StatelessWidget {
               PrimaryButton(
                 text: 'Start Game',
                 onPressed: () {
-                  context.push('/in-game');
+                  context.push('/in-game', extra: {'isSecretMode': isSecretMode});
                 },
               ),
               const SizedBox(height: 16),

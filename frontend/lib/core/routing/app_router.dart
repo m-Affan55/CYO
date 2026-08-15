@@ -37,11 +37,19 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/game-lobby',
-      builder: (context, state) => const GameLobbyScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final isSecretMode = extra?['isSecretMode'] as bool? ?? false;
+        return GameLobbyScreen(isSecretMode: isSecretMode);
+      },
     ),
     GoRoute(
       path: '/in-game',
-      builder: (context, state) => const InGameScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final isSecretMode = extra?['isSecretMode'] as bool? ?? false;
+        return InGameScreen(isSecretMode: isSecretMode);
+      },
     ),
   ],
 );

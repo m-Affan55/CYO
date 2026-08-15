@@ -7,6 +7,7 @@ import 'widgets/title_creation_view.dart';
 import 'widgets/roulette_selection_view.dart';
 import 'widgets/title_selection_view.dart';
 import 'widgets/voting_view.dart';
+import 'widgets/target_selection_view.dart'; // Add this import
 
 enum GamePhase {
   titleCreation,
@@ -19,7 +20,9 @@ enum GamePhase {
 }
 
 class InGameScreen extends StatefulWidget {
-  const InGameScreen({super.key});
+  final bool isSecretMode;
+
+  const InGameScreen({super.key, this.isSecretMode = false});
 
   @override
   State<InGameScreen> createState() => _InGameScreenState();
@@ -45,7 +48,7 @@ class _InGameScreenState extends State<InGameScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false, // Prevent accidental back
-        title: const Text('ROUND 1 / 5', style: TextStyle(fontSize: 12, letterSpacing: 2, color: AppTheme.textMuted)),
+        title: Text(widget.isSecretMode ? 'SECRET ROUND 1 / 5' : 'ROUND 1 / 5', style: const TextStyle(fontSize: 12, letterSpacing: 2, color: AppTheme.textMuted)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -74,7 +77,14 @@ class _InGameScreenState extends State<InGameScreen> {
       case GamePhase.titleCreation:
         return TitleCreationView(
           key: const ValueKey('titleCreation'),
-          onReady: () => _advancePhase(GamePhase.selectingAssigner),
+          onReady: () {
+            if (widget.isSecretMode) {
+              _assigner = 'You'; // Secretly assign
+              _advancePhase(GamePhase.selectingTarget);
+            } else {
+              _advancePhase(GamePhase.selectingAssigner);
+            }
+          },
         );
       
       case GamePhase.selectingAssigner:
@@ -92,7 +102,7 @@ class _InGameScreenState extends State<InGameScreen> {
       case GamePhase.selectingTarget:
         return RouletteSelectionView(
           key: const ValueKey('selectingTarget'),
-          prompt: 'SELECTING TARGET...',
+          prompt: widget.isSecretMode ? 'SECRETLY SELECTING TARGET...' : 'SELECTING TARGET...',
           players: _mockPlayers.where((p) => p != 'You').toList(),
           finalSelection: 'Mike', // Force "Mike" for demo purposes
           onComplete: () {
@@ -139,7 +149,7 @@ class _InGameScreenState extends State<InGameScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            '$_assigner called out',
+            widget.isSecretMode ? 'Someone called out' : '$_assigner called out',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.textMuted, letterSpacing: 2),
           ),
           const SizedBox(height: 16),
@@ -206,8 +216,10 @@ class _InGameScreenState extends State<InGameScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildScoreChange(_target, '+100 pts', AppTheme.successGreen),
-              const SizedBox(width: 32),
-              _buildScoreChange(_assigner, '+50 pts', AppTheme.textPrimary),
+              if (!widget.isSecretMode) ...[
+                const SizedBox(width: 32),
+                _buildScoreChange(_assigner, '+50 pts', AppTheme.textPrimary),
+              ],
             ],
           ),
           
@@ -216,7 +228,7 @@ class _InGameScreenState extends State<InGameScreen> {
             text: 'Next Round',
             onPressed: () {
               // Loop back to assigner selection for demo
-              _advancePhase(GamePhase.selectingAssigner);
+              _advancePhase(widget.isSecretMode ? GamePhase.selectingTarget : GamePhase.selectingAssigner);
             },
           ),
         ],

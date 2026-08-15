@@ -15,6 +15,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   int _maxPlayers = 6;
   int _selectedRounds = 5;
   int _selectedTimer = 30; // Max 30 seconds
+  bool _isSecretMode = false;
 
   final List<int> _roundOptions = [3, 5, 7, 10];
   final List<int> _timerOptions = [15, 20, 30];
@@ -222,13 +223,56 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 32),
+
+              // Secret Mode Toggle
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceCharcoal,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _isSecretMode ? AppTheme.primaryRed : const Color(0xFF2A2A2A)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SECRET CALLER MODE',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: _isSecretMode ? AppTheme.primaryRed : AppTheme.textPrimary,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Hide the identity of the person picking the title. Voting becomes completely unbiased!',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _isSecretMode,
+                      activeColor: AppTheme.primaryRed,
+                      onChanged: (val) => setState(() => _isSecretMode = val),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 48),
 
               // Action Buttons
               PrimaryButton(
                 text: 'Continue – Invite Friends',
                 onPressed: () {
-                  context.push('/game-lobby');
+                  context.push('/game-lobby', extra: {'isSecretMode': _isSecretMode});
                 },
               ),
               const SizedBox(height: 16),
@@ -236,7 +280,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {
-                    context.push('/game-lobby');
+                    context.push('/game-lobby', extra: {'isSecretMode': _isSecretMode});
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.textPrimary,
