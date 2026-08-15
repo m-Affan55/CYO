@@ -23,6 +23,10 @@ class GameEngine:
     def get_state(self, room_id: str) -> dict:
         return self.games.get(room_id, {})
 
+    def update_players(self, room_id: str, users: list):
+        if room_id in self.games:
+            self.games[room_id]["players"] = users
+
     def submit_title(self, room_id: str, user_id: str, title: str) -> bool:
         """Returns True if all players have submitted a title."""
         if room_id not in self.games:

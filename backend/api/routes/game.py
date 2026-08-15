@@ -20,6 +20,20 @@ async def broadcast_state(room_id: str):
         "state": state
     })
 
+async def broadcast_players(room_id: str):
+    async with AsyncSessionLocal() as db:
+        users_res = await db.execute(select(User).where(User.room_id == room_id))
+        users = users_res.scalars().all()
+        players_data = [{"id": str(u.id), "name": u.name, "color": u.color, "is_connected": u.is_connected} for u in users]
+        user_ids = [str(u.id) for u in users]
+        
+    engine.update_players(room_id, user_ids)
+    
+    await manager.broadcast_to_room(room_id, {
+        "event": "PLAYERS_UPDATED",
+        "players": players_data
+    })
+
 async def handle_submit_title(data: dict, room_id: str, user_id: str):
     title_text = data.get("title")
     if not title_text:
@@ -97,6 +111,9 @@ async def handle_start_game(data: dict, room_id: str, user_id: str):
             users = users_res.scalars().all()
             user_ids = [str(u.id) for u in users]
             
+            if len(user_ids) < 3:
+                return # Cannot start game with fewer than 3 players (Target, Assigner, 1 Voter)
+                
             await db.commit()
             
             engine.init_game(room_id, user_ids)
@@ -123,6 +140,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
         "user_id": user_id
     })
     
+    await broadcast_players(room_id)
+    
     # Send current game state if playing
     state = engine.get_state(room_id)
     if state:
@@ -146,6 +165,13 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                 await handle_select_assigner(data, room_id, user_id)
             elif action == "VOTE":
                 await handle_vote(data, room_id, user_id)
+            elif action == "TYPING":
+                is_typing = data.get("is_typing", False)
+                await manager.broadcast_to_room(room_id, {
+                    "event": "PLAYER_TYPING",
+                    "user_id": user_id,
+                    "is_typing": is_typing
+                })
 
     except WebSocketDisconnect:
         manager.disconnect(room_id, user_id)
@@ -162,6 +188,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
             "event": "PLAYER_LEFT",
             "user_id": user_id
         })
+        await broadcast_players(room_id)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(room_id, user_id)

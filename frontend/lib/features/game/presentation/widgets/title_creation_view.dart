@@ -5,14 +5,22 @@ class TitleCreationView extends StatefulWidget {
   final bool hasSubmitted;
   final int titlesSubmitted;
   final int totalPlayers;
+  final Map<String, dynamic> titlesMap;
+  final List<dynamic> players;
+  final List<String> typingNames;
   final Function(String) onTitleSubmit;
+  final Function(bool) onTyping;
 
   const TitleCreationView({
     super.key,
     required this.hasSubmitted,
     required this.titlesSubmitted,
     required this.totalPlayers,
+    required this.titlesMap,
+    required this.players,
+    required this.typingNames,
     required this.onTitleSubmit,
+    required this.onTyping,
   });
 
   @override
@@ -21,6 +29,28 @@ class TitleCreationView extends StatefulWidget {
 
 class _TitleCreationViewState extends State<TitleCreationView> {
   final TextEditingController _controller = TextEditingController();
+  bool _isTyping = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onTextChanged);
+  }
+  
+  @override
+  void dispose() {
+    _controller.removeListener(_onTextChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  void _onTextChanged() {
+    final hasText = _controller.text.isNotEmpty;
+    if (hasText != _isTyping) {
+      _isTyping = hasText;
+      widget.onTyping(_isTyping);
+    }
+  }
 
   void _submit() {
     if (_controller.text.trim().isNotEmpty && !widget.hasSubmitted) {
@@ -88,6 +118,27 @@ class _TitleCreationViewState extends State<TitleCreationView> {
           ),
         ],
         
+        if (widget.typingNames.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.textMuted),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${widget.typingNames.join(', ')} is typing a title...',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppTheme.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ],
+        
         const SizedBox(height: 32),
         
         // Progress
@@ -105,6 +156,36 @@ class _TitleCreationViewState extends State<TitleCreationView> {
           valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryRed),
           minHeight: 8,
           borderRadius: BorderRadius.circular(4),
+        ),
+        const SizedBox(height: 32),
+        
+        // List of added titles
+        Expanded(
+          child: ListView.separated(
+            itemCount: widget.titlesMap.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final authorId = widget.titlesMap.keys.elementAt(index);
+              final title = widget.titlesMap.values.elementAt(index);
+              
+              String authorName = 'Unknown';
+              final authorData = widget.players.cast<Map<String, dynamic>>().firstWhere(
+                (p) => p['id'] == authorId, 
+                orElse: () => {'name': 'Unknown'}
+              );
+              authorName = authorData['name'];
+              
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceCharcoal,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A2A2A)),
+                ),
+                child: Text('"$title" (by $authorName)', style: Theme.of(context).textTheme.bodyLarge),
+              );
+            },
+          ),
         ),
       ],
     );

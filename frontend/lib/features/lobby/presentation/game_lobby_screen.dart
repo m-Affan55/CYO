@@ -108,14 +108,18 @@ class GameLobbyScreen extends ConsumerWidget {
               ),
               
               // Buttons
-              PrimaryButton(
-                text: 'Start Game',
-                onPressed: () {
-                  final ws = ref.read(webSocketServiceProvider);
-                  ws.sendAction('START_GAME');
-                  context.push('/in-game', extra: {'isSecretMode': isSecretMode});
-                },
-              ),
+              Builder(builder: (context) {
+                final bool canStart = gameState.players.length >= 3;
+                return PrimaryButton(
+                  text: canStart ? 'Start Game' : 'Need 3 Players',
+                  onPressed: canStart ? () {
+                    final ws = ref.read(webSocketServiceProvider);
+                    ws.sendAction('START_GAME');
+                    context.push('/in-game', extra: {'isSecretMode': isSecretMode});
+                  } : () {},
+                  color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
+                );
+              }),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,

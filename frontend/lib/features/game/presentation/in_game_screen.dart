@@ -57,27 +57,39 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(opacity: animation, child: child);
             },
-            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id),
+            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id, gameState.typingPlayers),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId) {
+  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId, List<String> typingPlayers) {
     switch (phase) {
       case 'TITLE_CREATION':
         final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
         final hasSubmitted = titlesMap.containsKey(myUserId);
         
+        final typingNames = typingPlayers
+            .where((id) => id != myUserId)
+            .map((id) => _getPlayerName(players, id))
+            .toList();
+
         return TitleCreationView(
           key: const ValueKey('titleCreation'),
           hasSubmitted: hasSubmitted,
           titlesSubmitted: titlesMap.length,
           totalPlayers: players.length,
+          titlesMap: titlesMap,
+          players: players,
+          typingNames: typingNames,
           onTitleSubmit: (title) {
             final ws = ref.read(webSocketServiceProvider);
             ws.sendAction('SUBMIT_TITLE', {'title': title});
+          },
+          onTyping: (isTyping) {
+            final ws = ref.read(webSocketServiceProvider);
+            ws.sendAction('TYPING', {'is_typing': isTyping});
           }
         );
       
@@ -99,7 +111,10 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             );
         } else {
             // This is just a transition phase
-            return Center(child: Text("Assigner selected: ${_getPlayerName(players, assignerId)}"));
+            final text = widget.isSecretMode
+                ? "An assigner was selected!"
+                : "Assigner selected: ${_getPlayerName(players, assignerId)}";
+            return Center(child: Text(text));
         }
 
       case 'SELECTING_TARGET':
@@ -132,7 +147,10 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             },
           );
         } else {
-          return Center(child: Text("$assignerName is picking a target and title..."));
+          final text = widget.isSecretMode
+              ? "Someone is picking a target and title..."
+              : "$assignerName is picking a target and title...";
+          return Center(child: Text(text));
         }
 
       case 'VOTING':
