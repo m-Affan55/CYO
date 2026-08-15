@@ -1,54 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
+import 'package:frontend/core/providers/game_provider.dart';
 
 import 'widgets/title_creation_view.dart';
-import 'widgets/roulette_selection_view.dart';
 import 'widgets/title_selection_view.dart';
 import 'widgets/voting_view.dart';
-import 'widgets/target_selection_view.dart'; // Add this import
 
-enum GamePhase {
-  titleCreation,
-  selectingAssigner,
-  selectingTarget,
-  titleSelection,
-  reveal,
-  voting,
-  roundResults,
+// Helper to find a user's name by their ID
+String _getPlayerName(List<dynamic> players, String? id) {
+  if (id == null) return 'Unknown';
+  final p = players.cast<Map<String, dynamic>>().firstWhere(
+    (p) => p['id'] == id, 
+    orElse: () => {'name': 'Unknown'}
+  );
+  return p['name'];
 }
 
-class InGameScreen extends StatefulWidget {
+class InGameScreen extends ConsumerStatefulWidget {
   final bool isSecretMode;
 
   const InGameScreen({super.key, this.isSecretMode = false});
 
   @override
-  State<InGameScreen> createState() => _InGameScreenState();
+  ConsumerState<InGameScreen> createState() => _InGameScreenState();
 }
 
-class _InGameScreenState extends State<InGameScreen> {
-  GamePhase _currentPhase = GamePhase.titleCreation;
+class _InGameScreenState extends ConsumerState<InGameScreen> {
   
-  // Mock State
-  final List<String> _mockPlayers = ['You', 'Sarah', 'Mike', 'Jess', 'Alex', 'Chris'];
-  String _assigner = '';
-  String _target = '';
-  String _selectedTitle = '';
-
-  void _advancePhase(GamePhase nextPhase) {
-    setState(() {
-      _currentPhase = nextPhase;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final gameState = ref.watch(gameStateProvider);
+    final user = ref.watch(userProvider);
+    final engineState = gameState.engineState ?? {};
+    final phase = engineState['phase'] ?? 'TITLE_CREATION';
+    
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false, // Prevent accidental back
-        title: Text(widget.isSecretMode ? 'SECRET ROUND 1 / 5' : 'ROUND 1 / 5', style: const TextStyle(fontSize: 12, letterSpacing: 2, color: AppTheme.textMuted)),
+        title: Text(widget.isSecretMode ? 'SECRET ROUND' : 'GAME ROUND', style: const TextStyle(fontSize: 12, letterSpacing: 2, color: AppTheme.textMuted)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -65,120 +57,128 @@ class _InGameScreenState extends State<InGameScreen> {
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(opacity: animation, child: child);
             },
-            child: _buildCurrentPhase(),
+            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCurrentPhase() {
-    switch (_currentPhase) {
-      case GamePhase.titleCreation:
+  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId) {
+    switch (phase) {
+      case 'TITLE_CREATION':
+        final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
+        final hasSubmitted = titlesMap.containsKey(myUserId);
+        
         return TitleCreationView(
           key: const ValueKey('titleCreation'),
-          onReady: () {
-            if (widget.isSecretMode) {
-              _assigner = 'You'; // Secretly assign
-              _advancePhase(GamePhase.selectingTarget);
-            } else {
-              _advancePhase(GamePhase.selectingAssigner);
-            }
-          },
+          hasSubmitted: hasSubmitted,
+          titlesSubmitted: titlesMap.length,
+          totalPlayers: players.length,
+          onTitleSubmit: (title) {
+            final ws = ref.read(webSocketServiceProvider);
+            ws.sendAction('SUBMIT_TITLE', {'title': title});
+          }
         );
       
-      case GamePhase.selectingAssigner:
-        return RouletteSelectionView(
-          key: const ValueKey('selectingAssigner'),
-          prompt: 'SELECTING ASSIGNER...',
-          players: _mockPlayers,
-          finalSelection: 'You', // Force "You" for demo purposes
-          onComplete: () {
-            _assigner = 'You';
-            _advancePhase(GamePhase.selectingTarget);
-          },
-        );
+      case 'SELECTING_ASSIGNER':
+        // For MVP, if there is no assigner picked yet, anyone can click a button to pick an assigner.
+        // Usually, the server picks randomly, or host presses. Let's just give everyone a button.
+        final assignerId = engineState['assigner_id'];
+        
+        if (assignerId == null) {
+            return Center(
+              child: PrimaryButton(
+                text: 'Spin Assigner Wheel',
+                onPressed: () {
+                   // Just pick self for MVP demo, or random
+                   final ws = ref.read(webSocketServiceProvider);
+                   ws.sendAction('SELECT_ASSIGNER', {'assigner_id': myUserId});
+                }
+              )
+            );
+        } else {
+            // This is just a transition phase
+            return Center(child: Text("Assigner selected: ${_getPlayerName(players, assignerId)}"));
+        }
 
-      case GamePhase.selectingTarget:
-        return RouletteSelectionView(
-          key: const ValueKey('selectingTarget'),
-          prompt: widget.isSecretMode ? 'SECRETLY SELECTING TARGET...' : 'SELECTING TARGET...',
-          players: _mockPlayers.where((p) => p != 'You').toList(),
-          finalSelection: 'Mike', // Force "Mike" for demo purposes
-          onComplete: () {
-            _target = 'Mike';
-            _advancePhase(GamePhase.titleSelection);
-          },
-        );
+      case 'SELECTING_TARGET':
+      case 'TITLE_SELECTION':
+        final assignerId = engineState['assigner_id'];
+        final amIAssigner = (assignerId == myUserId);
+        final assignerName = _getPlayerName(players, assignerId);
+        
+        if (amIAssigner) {
+          // I am picking the target and title
+          final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
+          final availableTitles = titlesMap.values.cast<String>().toList();
+          
+          // Target selection mock: Just pick first other player
+          final possibleTargets = players.where((p) => p['id'] != myUserId).toList();
+          final targetId = possibleTargets.isNotEmpty ? possibleTargets.first['id'] : myUserId;
+          final targetName = _getPlayerName(players, targetId);
+          
+          return TitleSelectionView(
+            key: const ValueKey('titleSelection'),
+            assignerName: 'You',
+            targetName: targetName,
+            availableTitles: availableTitles,
+            onTitleSelected: (title) {
+              final ws = ref.read(webSocketServiceProvider);
+              ws.sendAction('ASSIGN_TITLE', {
+                  'target_id': targetId,
+                  'title': title
+              });
+            },
+          );
+        } else {
+          return Center(child: Text("$assignerName is picking a target and title..."));
+        }
 
-      case GamePhase.titleSelection:
-        return TitleSelectionView(
-          key: const ValueKey('titleSelection'),
-          assignerName: _assigner,
-          targetName: _target,
-          availableTitles: const ['Code Wizard', 'Always Late', 'Design Guru', 'Main Character', 'The Ghost'],
-          onTitleSelected: (title) {
-            _selectedTitle = title;
-            _advancePhase(GamePhase.reveal);
-          },
-        );
-
-      case GamePhase.reveal:
-        return _buildRevealView();
-
-      case GamePhase.voting:
+      case 'VOTING':
+        final targetId = engineState['target_id'];
+        final assignerId = engineState['assigner_id'];
+        final title = engineState['selected_title'];
+        final targetName = _getPlayerName(players, targetId);
+        
+        final amITarget = (targetId == myUserId);
+        final amIAssigner = (assignerId == myUserId);
+        
+        if (amITarget || amIAssigner) {
+           return Center(
+             child: Column(
+               mainAxisAlignment: MainAxisAlignment.center,
+               children: [
+                 Text('VOTING IN PROGRESS...', style: Theme.of(context).textTheme.displayMedium),
+                 const SizedBox(height: 16),
+                 Text('Wait for others to vote if $targetName is "$title".')
+               ]
+             )
+           );
+        }
+        
         return VotingView(
           key: const ValueKey('voting'),
-          targetName: _target,
-          title: _selectedTitle,
+          targetName: targetName,
+          title: title ?? '',
           onVote: (vote) {
-            // In a real app, send to backend. Here we just advance to results.
-            _advancePhase(GamePhase.roundResults);
+            final ws = ref.read(webSocketServiceProvider);
+            bool boolVote = vote == 'agree'; // Maps agree to true, otherwise false
+            ws.sendAction('VOTE', {'vote': boolVote});
           },
         );
 
-      case GamePhase.roundResults:
-        return _buildResultsView();
+      case 'ROUND_RESULTS':
+        return _buildResultsView(engineState, players);
+        
+      default:
+        return const Center(child: CircularProgressIndicator());
     }
   }
 
-  Widget _buildRevealView() {
-    return Center(
-      key: const ValueKey('reveal'),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            widget.isSecretMode ? 'Someone called out' : '$_assigner called out',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.textMuted, letterSpacing: 2),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _target,
-            style: Theme.of(context).textTheme.displayLarge?.copyWith(color: AppTheme.primaryRed),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'as',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.textMuted, letterSpacing: 2),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '"$_selectedTitle"',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displayMedium,
-          ),
-          const SizedBox(height: 64),
-          PrimaryButton(
-            text: 'Vote Now',
-            onPressed: () => _advancePhase(GamePhase.voting),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResultsView() {
+  Widget _buildResultsView(Map<String, dynamic> engineState, List<dynamic> players) {
+    // Note: To properly show results we need the latest points, which means we might need a fetch or the server sends it.
+    // For MVP, we'll just show a "Round Over" placeholder since points are updated in DB.
     return Center(
       key: const ValueKey('results'),
       child: Column(
@@ -191,58 +191,24 @@ class _InGameScreenState extends State<InGameScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'MAJORITY AGREE',
+              'ROUND COMPLETE',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.successGreen, letterSpacing: 2),
             ),
           ),
           const SizedBox(height: 32),
           Text(
-            _target,
-            style: Theme.of(context).textTheme.displayLarge,
+            "Points updated in database!",
+            style: Theme.of(context).textTheme.displayMedium,
           ),
-          Text(
-            'is now the',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
-          ),
-          Text(
-            '"$_selectedTitle"',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(color: AppTheme.primaryRed),
-          ),
-          const SizedBox(height: 48),
-          
-          // Mock Score Changes
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildScoreChange(_target, '+100 pts', AppTheme.successGreen),
-              if (!widget.isSecretMode) ...[
-                const SizedBox(width: 32),
-                _buildScoreChange(_assigner, '+50 pts', AppTheme.textPrimary),
-              ],
-            ],
-          ),
-          
           const SizedBox(height: 64),
           PrimaryButton(
-            text: 'Next Round',
+            text: 'End Game (MVP)',
             onPressed: () {
-              // Loop back to assigner selection for demo
-              _advancePhase(widget.isSecretMode ? GamePhase.selectingTarget : GamePhase.selectingAssigner);
+               context.go('/home');
             },
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildScoreChange(String name, String points, Color color) {
-    return Column(
-      children: [
-        Text(name, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 4),
-        Text(points, style: Theme.of(context).textTheme.displayMedium?.copyWith(color: color, fontSize: 24)),
-      ],
     );
   }
 
@@ -252,7 +218,7 @@ class _InGameScreenState extends State<InGameScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.surfaceCharcoal,
         title: const Text('Leave Game?'),
-        content: const Text('Are you sure you want to leave? You will forfeit the match.'),
+        content: const Text('Are you sure you want to leave?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

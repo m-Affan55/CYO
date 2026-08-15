@@ -34,18 +34,21 @@ class GameState {
   final String roomCode;
   final List<dynamic> players;
   final String status;
+  final Map<String, dynamic>? engineState;
   
   GameState({
     this.roomCode = '',
     this.players = const [],
     this.status = 'WAITING',
+    this.engineState,
   });
 
-  GameState copyWith({String? roomCode, List<dynamic>? players, String? status}) {
+  GameState copyWith({String? roomCode, List<dynamic>? players, String? status, Map<String, dynamic>? engineState}) {
     return GameState(
       roomCode: roomCode ?? this.roomCode,
       players: players ?? this.players,
       status: status ?? this.status,
+      engineState: engineState ?? this.engineState,
     );
   }
 }
@@ -68,7 +71,9 @@ class GameStateNotifier extends StateNotifier<GameState> {
     // As a simple approach for MVP, if we get an event that someone joined,
     // we would ideally re-fetch the room or append them.
     // For now we just print it.
-    if (eventType == 'GAME_STARTED') {
+    if (eventType == 'STATE_UPDATE') {
+      state = state.copyWith(engineState: event['state']);
+    } else if (eventType == 'GAME_STARTED') {
       state = state.copyWith(status: 'PLAYING');
     }
   }
