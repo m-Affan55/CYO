@@ -1,8 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static String get baseUrl {
+    if (kIsWeb) return 'http://127.0.0.1:8000/api';
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000/api';
+    return 'http://127.0.0.1:8000/api';
+  }
 
   Future<Map<String, dynamic>> createRoom(String hostName, String hostColor, int maxPlayers, int rounds, int timer, bool secretMode) async {
     final response = await http.post(

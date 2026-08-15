@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class WebSocketService {
   WebSocketChannel? _channel;
@@ -11,7 +13,12 @@ class WebSocketService {
   Function()? onDisconnected;
 
   void connect(String roomCode, String userId) {
-    final wsUrl = Uri.parse('ws://127.0.0.1:8000/api/game/ws/$roomCode/$userId');
+    String host = '127.0.0.1';
+    if (!kIsWeb && Platform.isAndroid) {
+      host = '10.0.2.2';
+    }
+    
+    final wsUrl = Uri.parse('ws://$host:8000/api/game/ws/$roomCode/$userId');
     _channel = WebSocketChannel.connect(wsUrl);
 
     _subscription = _channel!.stream.listen(
