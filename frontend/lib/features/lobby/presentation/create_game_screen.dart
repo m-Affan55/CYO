@@ -13,11 +13,11 @@ class CreateGameScreen extends StatefulWidget {
 class _CreateGameScreenState extends State<CreateGameScreen> {
   final TextEditingController _gameNameController = TextEditingController(text: 'Friday Night CYO');
   int _maxPlayers = 6;
-  int _selectedRounds = 5;
+  int _selectedRounds = 3;
   int _selectedTimer = 30; // Max 30 seconds
   bool _isSecretMode = false;
 
-  final List<int> _roundOptions = [3, 5, 7, 10];
+  final List<int> _roundOptions = [1, 2, 3, 5];
   final List<int> _timerOptions = [15, 20, 30];
 
   @override
