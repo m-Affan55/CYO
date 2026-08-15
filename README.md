@@ -1,4 +1,4 @@
-# Friends Title Game
+# CYO (Call You Out)
 
 ## Overview
 Friends Title Game is a real-time multiplayer social party game designed for groups of friends. Players join the same online game room, collaboratively create a shared pool of titles, and take turns assigning titles to other players. A randomly selected player assigns a title to a randomly selected target, and the rest of the group votes on whether the title fits the target. Real-time state changes, short animations, and visible feedback drive the core game loop.
