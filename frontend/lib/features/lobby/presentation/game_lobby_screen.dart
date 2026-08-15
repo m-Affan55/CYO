@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/providers/game_provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
 
-class GameLobbyScreen extends StatelessWidget {
+class GameLobbyScreen extends ConsumerWidget {
   final bool isSecretMode;
 
   const GameLobbyScreen({super.key, required this.isSecretMode});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gameState = ref.watch(gameStateProvider);
+    
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -38,7 +42,7 @@ class GameLobbyScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'X7K92P',
+                    gameState.roomCode.isEmpty ? '....' : gameState.roomCode,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       letterSpacing: 4,
                       fontWeight: FontWeight.bold,
@@ -73,7 +77,7 @@ class GameLobbyScreen extends StatelessWidget {
                         Text('Waiting for players...', style: Theme.of(context).textTheme.bodyMedium),
                       ],
                     ),
-                    Text('6 / 8', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('${gameState.players.length} / 12', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -86,16 +90,19 @@ class GameLobbyScreen extends StatelessWidget {
                   childAspectRatio: 2.2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  children: [
-                    _PlayerLobbyCard(initials: 'YO', name: 'You', isReady: true, isHost: true, color: AppTheme.primaryRed),
-                    _PlayerLobbyCard(initials: 'SK', name: 'Sarah K', isReady: true, color: const Color(0xFF6B4EFF)),
-                    _PlayerLobbyCard(initials: 'MT', name: 'Mike T', isReady: false, color: const Color(0xFF00C4B4)),
-                    _PlayerLobbyCard(initials: 'JR', name: 'Jess R', isReady: true, color: const Color(0xFFFF9500)),
-                    _PlayerLobbyCard(initials: 'AM', name: 'Alex M', isReady: false, color: const Color(0xFF34C759)),
-                    _PlayerLobbyCard(initials: 'CB', name: 'Chris B', isReady: true, color: const Color(0xFFAF52DE)),
-                    const _EmptyLobbySlot(),
-                    const _EmptyLobbySlot(),
-                  ],
+                  children: gameState.players.map((p) {
+                    final isHost = false; // We can add host checking logic later based on host_id
+                    final isReady = p['is_connected'] == true;
+                    final initials = (p['name'] as String).substring(0, 1).toUpperCase();
+                    
+                    return _PlayerLobbyCard(
+                      initials: initials,
+                      name: p['name'],
+                      isReady: isReady,
+                      isHost: isHost,
+                      color: AppTheme.primaryRed,
+                    );
+                  }).toList(),
                 ),
               ),
               
@@ -103,6 +110,8 @@ class GameLobbyScreen extends StatelessWidget {
               PrimaryButton(
                 text: 'Start Game',
                 onPressed: () {
+                  final ws = ref.read(webSocketServiceProvider);
+                  ws.sendAction('START_GAME');
                   context.push('/in-game', extra: {'isSecretMode': isSecretMode});
                 },
               ),
@@ -224,23 +233,4 @@ class _PlayerLobbyCard extends StatelessWidget {
   }
 }
 
-class _EmptyLobbySlot extends StatelessWidget {
-  const _EmptyLobbySlot();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundBlack,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A), style: BorderStyle.solid),
-      ),
-      child: Center(
-        child: Text(
-          'Empty',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
-        ),
-      ),
-    );
-  }
-}

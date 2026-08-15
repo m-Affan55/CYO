@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/providers/game_provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
-class OnlineMultiplayerScreen extends StatelessWidget {
+class OnlineMultiplayerScreen extends ConsumerStatefulWidget {
   const OnlineMultiplayerScreen({super.key});
+
+  @override
+  ConsumerState<OnlineMultiplayerScreen> createState() => _OnlineMultiplayerScreenState();
+}
+
+class _OnlineMultiplayerScreenState extends ConsumerState<OnlineMultiplayerScreen> {
+  final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController(text: 'Player');
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -49,32 +60,80 @@ class OnlineMultiplayerScreen extends StatelessWidget {
                 description: 'Enter an invite code to jump into an existing game with friends.',
                 icon: Icons.login,
                 isPrimary: false,
-                onTap: () {
-                  // context.push('/join-game');
+                onTap: () async {
+                  if (_isLoading) return;
+                  if (_codeController.text.length != 4) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code must be 4 letters')));
+                    return;
+                  }
+                  
+                  setState(() => _isLoading = true);
+                  try {
+                    final api = ref.read(apiServiceProvider);
+                    final response = await api.joinRoom(
+                      _codeController.text, 
+                      _nameController.text, 
+                      '#00C4B4' // Default color
+                    );
+                    
+                    ref.read(userProvider.notifier).state = UserState(
+                      id: response['id'],
+                      name: response['name'],
+                      color: response['color'],
+                      roomId: response['room_id'],
+                    );
+                    
+                    // Note: Ideally we'd fetch the room data to set in GameState.
+                    // For MVP, we'll just set the roomCode.
+                    ref.read(gameStateProvider.notifier).setRoomData({'id': response['room_id']});
+                    
+                    final ws = ref.read(webSocketServiceProvider);
+                    ws.onMessageReceived = (event) {
+                      ref.read(gameStateProvider.notifier).handleWebSocketEvent(event);
+                    };
+                    ws.connect(response['room_id'], response['id']);
+                    
+                    if (!context.mounted) return;
+                    context.push('/game-lobby', extra: {'isSecretMode': false});
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
                 },
                 child: Padding(
                   padding: const EdgeInsets.only(top: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(6, (index) => _buildCodeBox()),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          hintText: 'Your Name',
+                          filled: true,
+                          fillColor: AppTheme.backgroundBlack,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _codeController,
+                        maxLength: 4,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          hintText: '4-Letter Code',
+                          filled: true,
+                          fillColor: AppTheme.backgroundBlack,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCodeBox() {
-    return Container(
-      width: 40,
-      height: 48,
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundBlack,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
       ),
     );
   }

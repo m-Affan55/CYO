@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/providers/game_provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
 
-class CreateGameScreen extends StatefulWidget {
+class CreateGameScreen extends ConsumerStatefulWidget {
   const CreateGameScreen({super.key});
 
   @override
-  State<CreateGameScreen> createState() => _CreateGameScreenState();
+  ConsumerState<CreateGameScreen> createState() => _CreateGameScreenState();
 }
 
-class _CreateGameScreenState extends State<CreateGameScreen> {
-  final TextEditingController _gameNameController = TextEditingController(text: 'Friday Night CYO');
+class _CreateGameScreenState extends ConsumerState<CreateGameScreen> {
+  final TextEditingController _gameNameController = TextEditingController(text: 'Host');
+  bool _isLoading = false;
   int _maxPlayers = 6;
   int _selectedRounds = 3;
   int _selectedTimer = 30; // Max 30 seconds
@@ -270,9 +273,46 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
 
               // Action Buttons
               PrimaryButton(
-                text: 'Continue – Invite Friends',
-                onPressed: () {
-                  context.push('/game-lobby', extra: {'isSecretMode': _isSecretMode});
+                text: _isLoading ? 'Creating...' : 'Continue – Invite Friends',
+                onPressed: () async {
+                  if (_isLoading) return;
+                  setState(() => _isLoading = true);
+                  
+                  try {
+                    final api = ref.read(apiServiceProvider);
+                    final response = await api.createRoom(
+                      _gameNameController.text, 
+                      '#FF5733', // Default color
+                      _maxPlayers, 
+                      _selectedRounds, 
+                      _selectedTimer, 
+                      _isSecretMode
+                    );
+                    
+                    ref.read(gameStateProvider.notifier).setRoomData(response);
+                    
+                    final hostUser = response['users'][0];
+                    ref.read(userProvider.notifier).state = UserState(
+                      id: hostUser['id'],
+                      name: hostUser['name'],
+                      color: hostUser['color'],
+                      roomId: hostUser['room_id'],
+                    );
+                    
+                    final ws = ref.read(webSocketServiceProvider);
+                    ws.onMessageReceived = (event) {
+                      ref.read(gameStateProvider.notifier).handleWebSocketEvent(event);
+                    };
+                    ws.connect(hostUser['room_id'], hostUser['id']);
+                    
+                    if (!context.mounted) return;
+                    context.push('/game-lobby', extra: {'isSecretMode': _isSecretMode});
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
                 },
               ),
               const SizedBox(height: 16),
