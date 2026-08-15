@@ -1,9 +1,18 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from core.database import get_db
+from contextlib import asynccontextmanager
+from core.database import get_db, engine, Base
+import models.room, models.user, models.title
 
-app = FastAPI(title="CYO Game API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables on startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+
+app = FastAPI(title="CYO Game API", lifespan=lifespan)
 
 @app.get("/")
 def root():
