@@ -101,7 +101,7 @@ class GameLobbyScreen extends StatelessWidget {
               PrimaryButton(
                 text: 'Start Game',
                 onPressed: () {
-                  // context.push('/game-active');
+                  context.push('/in-game');
                 },
               ),
               const SizedBox(height: 16),

@@ -6,6 +6,7 @@ import 'package:frontend/features/home/presentation/home_screen.dart';
 import 'package:frontend/features/lobby/presentation/online_multiplayer_screen.dart';
 import 'package:frontend/features/lobby/presentation/create_game_screen.dart';
 import 'package:frontend/features/lobby/presentation/game_lobby_screen.dart';
+import 'package:frontend/features/game/presentation/in_game_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -37,6 +38,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/game-lobby',
       builder: (context, state) => const GameLobbyScreen(),
+    ),
+    GoRoute(
+      path: '/in-game',
+      builder: (context, state) => const InGameScreen(),
     ),
   ],
 );
