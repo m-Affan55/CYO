@@ -13,6 +13,18 @@ class GameLobbyScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<GameState>(gameStateProvider, (previous, next) {
+      if (previous?.status != 'PLAYING' && next.status == 'PLAYING') {
+        // If the host pushed the button, they already navigated manually in onPressed.
+        // We ensure we only push if we are currently on the lobby screen, 
+        // but GoRouter handles pushes fine. However, to prevent double pushes for the host:
+        final user = ref.read(userProvider);
+        if (user.id != next.hostId) {
+            context.push('/in-game', extra: {'isSecretMode': isSecretMode});
+        }
+      }
+    });
+
     final gameState = ref.watch(gameStateProvider);
     final user = ref.watch(userProvider);
     

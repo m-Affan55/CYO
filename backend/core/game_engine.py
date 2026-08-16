@@ -98,6 +98,7 @@ class GameEngine:
         state["target_id"] = None
         state["selected_title"] = None
         state["votes"] = {}
+        state["voting_ends_at"] = None
         
         # Check if everyone has been assigner this round
         if len(state["assigned_this_round"]) >= len(state["players"]):
@@ -113,6 +114,9 @@ class GameEngine:
     def submit_vote(self, room_id: str, user_id: str, vote: str) -> bool:
         """Returns True if all eligible voters have voted."""
         if room_id not in self.games:
+            return False
+            
+        if self.games[room_id].get("phase") != "VOTING":
             return False
             
         self.games[room_id]["votes"][user_id] = vote

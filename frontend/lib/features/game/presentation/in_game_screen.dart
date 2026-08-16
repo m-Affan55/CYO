@@ -98,6 +98,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
       
       case 'SELECTING_ASSIGNER':
         return Center(
+          key: const ValueKey('SELECTING_ASSIGNER'),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -110,6 +111,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
 
       case 'SELECTING_TARGET':
         return Center(
+          key: const ValueKey('SELECTING_TARGET'),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -136,7 +138,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
               .toList();
           
           return TitleSelectionView(
-            key: const ValueKey('titleSelection'),
+            key: const ValueKey('TITLE_SELECTION_ASSIGNER'),
             assignerName: 'You',
             targetName: targetName,
             availableTitles: availableTitles,
@@ -151,7 +153,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           final text = widget.isSecretMode
               ? "Someone is picking a title for $targetName..."
               : "$assignerName is picking a title for $targetName...";
-          return Center(child: Text(text));
+          return Center(key: const ValueKey('TITLE_SELECTION_WAITING'), child: Text(text));
         }
 
       case 'VOTING':
@@ -159,13 +161,14 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         final assignerId = engineState['assigner_id'];
         final title = engineState['selected_title'];
         final targetName = _getPlayerName(players, targetId);
-        final votingEndsAt = engineState['voting_ends_at'] as double?;
+        final votingEndsAt = (engineState['voting_ends_at'] as num?)?.toDouble();
         
         final amITarget = (targetId == myUserId);
         final amIAssigner = (assignerId == myUserId);
         
         if (amITarget || amIAssigner) {
            return Center(
+             key: const ValueKey('VOTING_WAITING'),
              child: Column(
                mainAxisAlignment: MainAxisAlignment.center,
                children: [
@@ -193,7 +196,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         return _buildResultsView(phase, engineState, players);
         
       default:
-        return const Center(child: CircularProgressIndicator());
+        return Center(key: const ValueKey('DEFAULT'), child: const CircularProgressIndicator());
     }
   }
 
