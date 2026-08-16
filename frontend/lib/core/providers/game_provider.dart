@@ -32,6 +32,7 @@ final userProvider = StateProvider<UserState>((ref) => UserState());
 
 class GameState {
   final String roomCode;
+  final String hostId;
   final List<dynamic> players;
   final String status;
   final Map<String, dynamic>? engineState;
@@ -39,15 +40,17 @@ class GameState {
   
   GameState({
     this.roomCode = '',
+    this.hostId = '',
     this.players = const [],
     this.status = 'WAITING',
     this.engineState,
     this.typingPlayers = const [],
   });
 
-  GameState copyWith({String? roomCode, List<dynamic>? players, String? status, Map<String, dynamic>? engineState, List<String>? typingPlayers}) {
+  GameState copyWith({String? roomCode, String? hostId, List<dynamic>? players, String? status, Map<String, dynamic>? engineState, List<String>? typingPlayers}) {
     return GameState(
       roomCode: roomCode ?? this.roomCode,
+      hostId: hostId ?? this.hostId,
       players: players ?? this.players,
       status: status ?? this.status,
       engineState: engineState ?? this.engineState,
@@ -62,6 +65,7 @@ class GameStateNotifier extends StateNotifier<GameState> {
   void setRoomData(Map<String, dynamic> data) {
     state = state.copyWith(
       roomCode: data['id'] ?? data['room_id'] ?? state.roomCode,
+      hostId: data['host_id'] ?? state.hostId,
       players: data['users'] ?? state.players,
       status: data['status'] ?? state.status,
     );

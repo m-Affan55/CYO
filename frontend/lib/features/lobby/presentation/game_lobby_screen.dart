@@ -14,6 +14,7 @@ class GameLobbyScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameStateProvider);
+    final user = ref.watch(userProvider);
     
     return Scaffold(
       appBar: AppBar(
@@ -92,7 +93,7 @@ class GameLobbyScreen extends ConsumerWidget {
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
                   children: gameState.players.map((p) {
-                    final isHost = false; // We can add host checking logic later based on host_id
+                    final isHost = p['id'] == gameState.hostId;
                     final isReady = p['is_connected'] == true;
                     final initials = (p['name'] as String).substring(0, 1).toUpperCase();
                     
@@ -108,18 +109,28 @@ class GameLobbyScreen extends ConsumerWidget {
               ),
               
               // Buttons
-              Builder(builder: (context) {
-                final bool canStart = gameState.players.length >= 3;
-                return PrimaryButton(
-                  text: canStart ? 'Start Game' : 'Need 3 Players',
-                  onPressed: canStart ? () {
-                    final ws = ref.read(webSocketServiceProvider);
-                    ws.sendAction('START_GAME');
-                    context.push('/in-game', extra: {'isSecretMode': isSecretMode});
-                  } : () {},
-                  color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
-                );
-              }),
+              if (user.id == gameState.hostId)
+                Builder(builder: (context) {
+                  final bool canStart = gameState.players.length >= 3;
+                  return PrimaryButton(
+                    text: canStart ? 'Start Game' : 'Need 3 Players',
+                    onPressed: canStart ? () {
+                      final ws = ref.read(webSocketServiceProvider);
+                      ws.sendAction('START_GAME');
+                      context.push('/in-game', extra: {'isSecretMode': isSecretMode});
+                    } : () {},
+                    color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
+                  );
+                })
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'Waiting for host to start...',
+                    style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+                  ),
+                ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,

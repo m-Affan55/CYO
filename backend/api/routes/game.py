@@ -1,5 +1,6 @@
 import json
 import logging
+import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
@@ -24,7 +25,7 @@ async def broadcast_players(room_id: str):
     async with AsyncSessionLocal() as db:
         users_res = await db.execute(select(User).where(User.room_id == room_id))
         users = users_res.scalars().all()
-        players_data = [{"id": str(u.id), "name": u.name, "color": u.color, "is_connected": u.is_connected} for u in users]
+        players_data = [{"id": str(u.id), "name": u.name, "color": u.color, "is_connected": u.is_connected, "score": u.score} for u in users]
         user_ids = [str(u.id) for u in users]
         
     engine.update_players(room_id, user_ids)
@@ -33,6 +34,44 @@ async def broadcast_players(room_id: str):
         "event": "PLAYERS_UPDATED",
         "players": players_data
     })
+
+async def process_round_results(room_id: str):
+    results = engine.calculate_results(room_id)
+    target_id = results.get("target_id")
+    assigner_id = results.get("assigner_id")
+    
+    async with AsyncSessionLocal() as db:
+        users_res = await db.execute(select(User).where(User.room_id == room_id))
+        users = users_res.scalars().all()
+        for u in users:
+            if str(u.id) == target_id:
+                u.score = (u.score or 0) + results.get("target_points", 0)
+            if str(u.id) == assigner_id:
+                u.score = (u.score or 0) + results.get("assigner_points", 0)
+        await db.commit()
+    
+    await broadcast_players(room_id)
+    await manager.broadcast_to_room(room_id, {
+        "event": "ROUND_RESULTS_COMPLETED",
+        "results": results
+    })
+    
+    # Auto-start next round
+    async def next_round_task():
+        await asyncio.sleep(8) # Show results for 8 seconds
+        has_next = engine.next_round(room_id)
+        await broadcast_state(room_id)
+        
+        if has_next:
+            await asyncio.sleep(3)
+            engine.select_assigner(room_id)
+            await broadcast_state(room_id)
+            
+            await asyncio.sleep(3)
+            engine.select_target(room_id)
+            await broadcast_state(room_id)
+            
+    asyncio.create_task(next_round_task())
 
 async def handle_submit_title(data: dict, room_id: str, user_id: str):
     title_text = data.get("title")
@@ -44,7 +83,6 @@ async def handle_submit_title(data: dict, room_id: str, user_id: str):
         db.add(new_title)
         await db.commit()
     
-    # Update state
     all_submitted = engine.submit_title(room_id, user_id, title_text)
     await manager.broadcast_to_room(room_id, {
         "event": "TITLE_ADDED",
@@ -52,21 +90,39 @@ async def handle_submit_title(data: dict, room_id: str, user_id: str):
     })
     await broadcast_state(room_id)
 
+    if all_submitted:
+        async def pick_roles_task():
+            await asyncio.sleep(3)
+            engine.select_assigner(room_id)
+            await broadcast_state(room_id)
+            
+            await asyncio.sleep(3)
+            engine.select_target(room_id)
+            await broadcast_state(room_id)
+            
+        asyncio.create_task(pick_roles_task())
+
 async def handle_assign_title(data: dict, room_id: str, user_id: str):
-    target_id = data.get("target_id")
     title = data.get("title")
-    if not target_id or not title:
+    if not title:
         return
         
-    engine.select_target_and_title(room_id, target_id, title)
+    engine.select_title(room_id, title)
     await broadcast_state(room_id)
     
-async def handle_select_assigner(data: dict, room_id: str, user_id: str):
-    assigner_id = data.get("assigner_id")
-    if not assigner_id:
-        return
-    engine.select_assigner(room_id, assigner_id)
-    await broadcast_state(room_id)
+    state = engine.get_state(room_id)
+    timer_duration = state.get("timer", 30)
+    current_round = state.get("round", 1)
+    
+    async def voting_timer():
+        await asyncio.sleep(timer_duration)
+        current_state = engine.get_state(room_id)
+        if current_state and current_state.get("phase") == "VOTING" and current_state.get("round") == current_round:
+            engine.force_finish_voting(room_id)
+            await broadcast_state(room_id)
+            await process_round_results(room_id)
+            
+    asyncio.create_task(voting_timer())
 
 async def handle_vote(data: dict, room_id: str, user_id: str):
     vote = data.get("vote") # boolean
@@ -77,25 +133,7 @@ async def handle_vote(data: dict, room_id: str, user_id: str):
     await broadcast_state(room_id)
     
     if all_voted:
-        # Save points to db
-        results = engine.calculate_results(room_id)
-        target_id = results.get("target_id")
-        assigner_id = results.get("assigner_id")
-        
-        async with AsyncSessionLocal() as db:
-            users_res = await db.execute(select(User).where(User.room_id == room_id))
-            users = users_res.scalars().all()
-            for u in users:
-                if str(u.id) == target_id:
-                    u.score = (u.score or 0) + results.get("target_points", 0)
-                if str(u.id) == assigner_id:
-                    u.score = (u.score or 0) + results.get("assigner_points", 0)
-            await db.commit()
-        
-        await manager.broadcast_to_room(room_id, {
-            "event": "ROUND_RESULTS_COMPLETED",
-            "results": results
-        })
+        await process_round_results(room_id)
 
 async def handle_start_game(data: dict, room_id: str, user_id: str):
     async with AsyncSessionLocal() as db:
@@ -105,18 +143,19 @@ async def handle_start_game(data: dict, room_id: str, user_id: str):
         if room and str(room.host_id) == user_id:
             room.status = RoomStatus.PLAYING
             room.current_round = 1
+            max_rounds = room.rounds
+            timer_duration = room.timer
             
-            # Fetch all users
             users_res = await db.execute(select(User).where(User.room_id == room_id))
             users = users_res.scalars().all()
             user_ids = [str(u.id) for u in users]
             
             if len(user_ids) < 3:
-                return # Cannot start game with fewer than 3 players (Target, Assigner, 1 Voter)
+                return
                 
             await db.commit()
             
-            engine.init_game(room_id, user_ids)
+            engine.init_game(room_id, user_ids, max_rounds=max_rounds, timer=timer_duration)
             
             await manager.broadcast_to_room(room_id, {
                 "event": "GAME_STARTED"
@@ -127,7 +166,6 @@ async def handle_start_game(data: dict, room_id: str, user_id: str):
 async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
     await manager.connect(websocket, room_id, user_id)
     
-    # Mark user as connected in DB
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
@@ -142,7 +180,6 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
     
     await broadcast_players(room_id)
     
-    # Send current game state if playing
     state = engine.get_state(room_id)
     if state:
         await websocket.send_json({
@@ -161,8 +198,6 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                 await handle_start_game(data, room_id, user_id)
             elif action == "ASSIGN_TITLE":
                 await handle_assign_title(data, room_id, user_id)
-            elif action == "SELECT_ASSIGNER":
-                await handle_select_assigner(data, room_id, user_id)
             elif action == "VOTE":
                 await handle_vote(data, room_id, user_id)
             elif action == "TYPING":
@@ -176,7 +211,6 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
     except WebSocketDisconnect:
         manager.disconnect(room_id, user_id)
         
-        # Mark user as disconnected in DB
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
