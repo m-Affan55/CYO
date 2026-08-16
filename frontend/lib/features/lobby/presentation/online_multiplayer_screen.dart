@@ -103,8 +103,12 @@ class _OnlineMultiplayerScreenState extends ConsumerState<OnlineMultiplayerScree
                             final response = await api.joinRoom(
                               _codeController.text, 
                               _nameController.text, 
-                              '#00C4B4' // Default color
+                              '#00C4B4'
                             );
+                            
+                            // BUG-7 & BUG-8: Reset stale state and close old WebSocket
+                            ref.read(webSocketServiceProvider).disconnect();
+                            ref.read(gameStateProvider.notifier).reset();
                             
                             ref.read(userProvider.notifier).state = UserState(
                               id: response['id'],

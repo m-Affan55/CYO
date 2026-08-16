@@ -14,14 +14,32 @@ class GameLobbyScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<GameState>(gameStateProvider, (previous, next) {
+      // BUG-10: Both host AND non-host navigate only after GAME_STARTED is confirmed by server.
+      // Removed the immediate push from the onPressed button.
       if (previous?.status != 'PLAYING' && next.status == 'PLAYING') {
-        // If the host pushed the button, they already navigated manually in onPressed.
-        // We ensure we only push if we are currently on the lobby screen, 
-        // but GoRouter handles pushes fine. However, to prevent double pushes for the host:
-        final user = ref.read(userProvider);
-        if (user.id != next.hostId) {
-            context.push('/in-game', extra: {'isSecretMode': isSecretMode});
-        }
+        context.push('/in-game', extra: {'isSecretMode': next.secretMode});
+      }
+      // BUG-4: Handle game abort
+      if (!previous!.isAborted && next.isAborted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            title: const Text('Game Aborted'),
+            content: Text(next.abortMessage),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  ref.read(gameStateProvider.notifier).reset();
+                  ref.read(webSocketServiceProvider).disconnect();
+                  context.go('/home');
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     });
 
@@ -91,7 +109,7 @@ class GameLobbyScreen extends ConsumerWidget {
                         Text('Waiting for players...', style: Theme.of(context).textTheme.bodyMedium),
                       ],
                     ),
-                    Text('${gameState.players.length} / 12', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('${gameState.players.length} / ${gameState.maxPlayers}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -126,10 +144,10 @@ class GameLobbyScreen extends ConsumerWidget {
                   final bool canStart = gameState.players.length >= 3;
                   return PrimaryButton(
                     text: canStart ? 'Start Game' : 'Need 3 Players',
+                    // BUG-10: Only send the WS action. Navigation is handled by ref.listen above.
                     onPressed: canStart ? () {
                       final ws = ref.read(webSocketServiceProvider);
                       ws.sendAction('START_GAME');
-                      context.push('/in-game', extra: {'isSecretMode': isSecretMode});
                     } : () {},
                     color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
                   );

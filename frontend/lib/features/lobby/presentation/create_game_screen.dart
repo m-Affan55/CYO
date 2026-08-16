@@ -282,12 +282,17 @@ class _CreateGameScreenState extends ConsumerState<CreateGameScreen> {
                     final api = ref.read(apiServiceProvider);
                     final response = await api.createRoom(
                       _gameNameController.text, 
-                      '#FF5733', // Default color
+                      '#FF5733',
                       _maxPlayers, 
                       _selectedRounds, 
                       _selectedTimer, 
                       _isSecretMode
                     );
+                    
+                    // BUG-7 & BUG-8: Reset any stale game state and close old WebSocket
+                    // before connecting to the new room
+                    ref.read(webSocketServiceProvider).disconnect();
+                    ref.read(gameStateProvider.notifier).reset();
                     
                     ref.read(gameStateProvider.notifier).setRoomData(response);
                     
