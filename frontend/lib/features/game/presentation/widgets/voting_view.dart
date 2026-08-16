@@ -4,12 +4,14 @@ import 'package:frontend/core/theme/app_theme.dart';
 class VotingView extends StatefulWidget {
   final String targetName;
   final String title;
+  final double? votingEndsAt;
   final Function(String) onVote;
 
   const VotingView({
     super.key,
     required this.targetName,
     required this.title,
+    this.votingEndsAt,
     required this.onVote,
   });
 
@@ -17,8 +19,43 @@ class VotingView extends StatefulWidget {
   State<VotingView> createState() => _VotingViewState();
 }
 
-class _VotingViewState extends State<VotingView> {
+class _VotingViewState extends State<VotingView> with SingleTickerProviderStateMixin {
   String? _selectedVote;
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+    _startTimer();
+  }
+  
+  @override
+  void didUpdateWidget(VotingView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.votingEndsAt != oldWidget.votingEndsAt) {
+      _startTimer();
+    }
+  }
+
+  void _startTimer() {
+    if (widget.votingEndsAt == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    final remaining = widget.votingEndsAt! - now;
+    
+    if (remaining > 0) {
+      _controller.duration = Duration(milliseconds: (remaining * 1000).toInt());
+      _controller.reverse(from: 1.0);
+    } else {
+      _controller.value = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   void _handleVote(String vote) {
     if (_selectedVote != null) return; // Prevent changing vote
@@ -79,11 +116,16 @@ class _VotingViewState extends State<VotingView> {
         const Spacer(),
         
         // Timer Bar
-        LinearProgressIndicator(
-          value: 0.7, // Mock value
-          backgroundColor: AppTheme.surfaceCharcoal,
-          valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.textPrimary),
-          minHeight: 4,
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return LinearProgressIndicator(
+              value: widget.votingEndsAt != null ? _controller.value : 0.7,
+              backgroundColor: AppTheme.surfaceCharcoal,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.textPrimary),
+              minHeight: 4,
+            );
+          },
         ),
         const SizedBox(height: 32),
         

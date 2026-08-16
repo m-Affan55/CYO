@@ -110,7 +110,7 @@ class GameEngine:
             
         return True
 
-    def submit_vote(self, room_id: str, user_id: str, vote: bool) -> bool:
+    def submit_vote(self, room_id: str, user_id: str, vote: str) -> bool:
         """Returns True if all eligible voters have voted."""
         if room_id not in self.games:
             return False
@@ -137,20 +137,28 @@ class GameEngine:
             return {}
             
         votes = state["votes"].values()
-        yes_votes = sum(1 for v in votes if v)
-        no_votes = len(votes) - yes_votes
+        agree_votes = sum(1 for v in votes if v == "agree")
+        disagree_votes = sum(1 for v in votes if v == "disagree")
+        # Neutral votes are intentionally ignored for majority calc
         
-        majority_agrees = yes_votes > no_votes
+        majority_agrees = agree_votes > disagree_votes
         
         target_pts = 100 if majority_agrees else 0
         assigner_pts = 50 if majority_agrees else -50
         
+        target_id = state.get("target_id")
+        assigner_id = state.get("assigner_id")
+        eligible_voters = [p for p in state["players"] if p not in (target_id, assigner_id)]
+        missed_voters = [p for p in eligible_voters if p not in state["votes"]]
+        
         return {
             "majority_agrees": majority_agrees,
-            "target_id": state["target_id"],
-            "assigner_id": state["assigner_id"],
+            "target_id": target_id,
+            "assigner_id": assigner_id,
             "target_points": target_pts,
             "assigner_points": assigner_pts,
+            "missed_voters": missed_voters,
+            "missed_penalty": -10,
         }
 
 engine = GameEngine()

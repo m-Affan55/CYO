@@ -159,6 +159,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         final assignerId = engineState['assigner_id'];
         final title = engineState['selected_title'];
         final targetName = _getPlayerName(players, targetId);
+        final votingEndsAt = engineState['voting_ends_at'] as double?;
         
         final amITarget = (targetId == myUserId);
         final amIAssigner = (assignerId == myUserId);
@@ -180,10 +181,10 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           key: const ValueKey('voting'),
           targetName: targetName,
           title: title ?? '',
+          votingEndsAt: votingEndsAt,
           onVote: (vote) {
             final ws = ref.read(webSocketServiceProvider);
-            bool boolVote = vote == 'agree'; // Maps agree to true, otherwise false
-            ws.sendAction('VOTE', {'vote': boolVote});
+            ws.sendAction('VOTE', {'vote': vote});
           },
         );
 

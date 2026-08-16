@@ -39,6 +39,8 @@ async def process_round_results(room_id: str):
     results = engine.calculate_results(room_id)
     target_id = results.get("target_id")
     assigner_id = results.get("assigner_id")
+    missed_voters = results.get("missed_voters", [])
+    missed_penalty = results.get("missed_penalty", 0)
     
     async with AsyncSessionLocal() as db:
         users_res = await db.execute(select(User).where(User.room_id == room_id))
@@ -48,6 +50,8 @@ async def process_round_results(room_id: str):
                 u.score = (u.score or 0) + results.get("target_points", 0)
             if str(u.id) == assigner_id:
                 u.score = (u.score or 0) + results.get("assigner_points", 0)
+            if str(u.id) in missed_voters:
+                u.score = (u.score or 0) + missed_penalty
         await db.commit()
     
     await broadcast_players(room_id)
@@ -116,11 +120,14 @@ async def handle_assign_title(data: dict, room_id: str, user_id: str):
         return
         
     engine.select_title(room_id, title)
-    await broadcast_state(room_id)
-    
     state = engine.get_state(room_id)
     timer_duration = state.get("timer", 30)
     current_round = state.get("round", 1)
+    
+    import time
+    engine.games[room_id]["voting_ends_at"] = time.time() + timer_duration
+    
+    await broadcast_state(room_id)
     
     async def voting_timer():
         await asyncio.sleep(timer_duration)
@@ -133,7 +140,7 @@ async def handle_assign_title(data: dict, room_id: str, user_id: str):
     asyncio.create_task(voting_timer())
 
 async def handle_vote(data: dict, room_id: str, user_id: str):
-    vote = data.get("vote") # boolean
+    vote = data.get("vote") # string: "agree", "disagree", "neutral"
     if vote is None:
         return
         
