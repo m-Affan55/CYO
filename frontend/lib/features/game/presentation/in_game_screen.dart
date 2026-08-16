@@ -67,8 +67,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
   Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId, List<String> typingPlayers) {
     switch (phase) {
       case 'TITLE_CREATION':
-        final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
-        final hasSubmitted = titlesMap.containsKey(myUserId);
+        final titles = engineState['titles'] as List<dynamic>? ?? [];
         
         final typingNames = typingPlayers
             .where((id) => id != myUserId)
@@ -77,12 +76,12 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
 
         return TitleCreationView(
           key: const ValueKey('titleCreation'),
-          hasSubmitted: hasSubmitted,
-          titlesSubmitted: titlesMap.length,
           totalPlayers: players.length,
-          titlesMap: titlesMap,
+          titles: titles,
           players: players,
           typingNames: typingNames,
+          myUserId: myUserId,
+          isHost: user.id == gameState.hostId,
           onTitleSubmit: (title) {
             final ws = ref.read(webSocketServiceProvider);
             ws.sendAction('SUBMIT_TITLE', {'title': title});
@@ -90,6 +89,10 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           onTyping: (isTyping) {
             final ws = ref.read(webSocketServiceProvider);
             ws.sendAction('TYPING', {'is_typing': isTyping});
+          },
+          onStartGame: () {
+            final ws = ref.read(webSocketServiceProvider);
+            ws.sendAction('START_ROUND');
           }
         );
       
@@ -125,9 +128,12 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         final targetName = _getPlayerName(players, targetId);
         
         if (amIAssigner) {
-          final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
+          final titles = engineState['titles'] as List<dynamic>? ?? [];
           final usedTitles = List<String>.from(engineState['used_titles'] ?? []);
-          final availableTitles = titlesMap.values.cast<String>().where((t) => !usedTitles.contains(t)).toList();
+          final availableTitles = titles
+              .map((t) => t['text'] as String)
+              .where((text) => !usedTitles.contains(text))
+              .toList();
           
           return TitleSelectionView(
             key: const ValueKey('titleSelection'),

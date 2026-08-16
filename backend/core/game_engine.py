@@ -13,7 +13,7 @@ class GameEngine:
         # Users is a list of user IDs
         self.games[room_id] = {
             "phase": "TITLE_CREATION",
-            "titles": {}, # user_id -> title string
+            "titles": [], # list of dicts: {"author_id": user_id, "text": title}
             "assigner_id": None,
             "target_id": None,
             "selected_title": None,
@@ -23,6 +23,7 @@ class GameEngine:
             "max_rounds": max_rounds,
             "timer": timer,
             "used_titles": [],
+            "assigned_this_round": [],
         }
 
     def get_state(self, room_id: str) -> dict:
@@ -33,23 +34,22 @@ class GameEngine:
             self.games[room_id]["players"] = users
 
     def submit_title(self, room_id: str, user_id: str, title: str) -> bool:
-        """Returns True if all players have submitted a title."""
+        """Adds a title. Returns False since we wait for explicit start."""
         if room_id not in self.games:
             return False
         
-        self.games[room_id]["titles"][user_id] = title
-        
-        # Check if everyone submitted
-        if len(self.games[room_id]["titles"]) >= len(self.games[room_id]["players"]):
-            self.games[room_id]["phase"] = "SELECTING_ASSIGNER"
-            return True
+        self.games[room_id]["titles"].append({"author_id": user_id, "text": title})
         return False
 
     def select_assigner(self, room_id: str):
         state = self.games.get(room_id)
         if state:
-            assigner_id = random.choice(state["players"])
+            available = [p for p in state["players"] if p not in state["assigned_this_round"]]
+            if not available: # Fallback just in case
+                available = state["players"]
+            assigner_id = random.choice(available)
             state["assigner_id"] = assigner_id
+            state["assigned_this_round"].append(assigner_id)
             state["phase"] = "SELECTING_TARGET"
             return assigner_id
 
@@ -76,7 +76,7 @@ class GameEngine:
             state["phase"] = "ROUND_RESULTS"
 
     def next_round(self, room_id: str) -> bool:
-        """Returns True if there is a next round, False if game over."""
+        """Returns True if there is a next turn/round, False if game over."""
         state = self.games.get(room_id)
         if not state:
             return False
@@ -86,19 +86,28 @@ class GameEngine:
         
         # Mark title as used
         title = state.get("selected_title")
-        if title:
+        if title and title not in state["used_titles"]:
             state["used_titles"].append(title)
             
-        if current_round >= max_rounds:
-            state["phase"] = "GAME_OVER"
-            return False
+        # Recycle titles if all used
+        if len(state["used_titles"]) >= len(state["titles"]):
+            state["used_titles"] = []
             
-        state["round"] = current_round + 1
         state["phase"] = "SELECTING_ASSIGNER"
         state["assigner_id"] = None
         state["target_id"] = None
         state["selected_title"] = None
         state["votes"] = {}
+        
+        # Check if everyone has been assigner this round
+        if len(state["assigned_this_round"]) >= len(state["players"]):
+            if current_round >= max_rounds:
+                state["phase"] = "GAME_OVER"
+                return False
+            
+            state["round"] = current_round + 1
+            state["assigned_this_round"] = []
+            
         return True
 
     def submit_vote(self, room_id: str, user_id: str, vote: bool) -> bool:

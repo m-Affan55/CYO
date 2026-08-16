@@ -83,24 +83,32 @@ async def handle_submit_title(data: dict, room_id: str, user_id: str):
         db.add(new_title)
         await db.commit()
     
-    all_submitted = engine.submit_title(room_id, user_id, title_text)
+    engine.submit_title(room_id, user_id, title_text)
     await manager.broadcast_to_room(room_id, {
         "event": "TITLE_ADDED",
         "user_id": user_id
     })
     await broadcast_state(room_id)
 
-    if all_submitted:
-        async def pick_roles_task():
-            await asyncio.sleep(3)
-            engine.select_assigner(room_id)
-            await broadcast_state(room_id)
-            
-            await asyncio.sleep(3)
-            engine.select_target(room_id)
-            await broadcast_state(room_id)
-            
-        asyncio.create_task(pick_roles_task())
+async def handle_start_round(data: dict, room_id: str, user_id: str):
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Room).where(Room.id == room_id))
+        room = result.scalar_one_or_none()
+        
+        if room and str(room.host_id) == user_id:
+            async def pick_roles_task():
+                engine.games[room_id]["phase"] = "SELECTING_ASSIGNER"
+                await broadcast_state(room_id)
+                
+                await asyncio.sleep(3)
+                engine.select_assigner(room_id)
+                await broadcast_state(room_id)
+                
+                await asyncio.sleep(3)
+                engine.select_target(room_id)
+                await broadcast_state(room_id)
+                
+            asyncio.create_task(pick_roles_task())
 
 async def handle_assign_title(data: dict, room_id: str, user_id: str):
     title = data.get("title")
@@ -194,6 +202,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
             
             if action == "SUBMIT_TITLE":
                 await handle_submit_title(data, room_id, user_id)
+            elif action == "START_ROUND":
+                await handle_start_round(data, room_id, user_id)
             elif action == "START_GAME":
                 await handle_start_game(data, room_id, user_id)
             elif action == "ASSIGN_TITLE":

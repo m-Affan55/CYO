@@ -82,8 +82,9 @@ class GameStateNotifier extends StateNotifier<GameState> {
       final engineState = event['state'] as Map<String, dynamic>?;
       var newTyping = state.typingPlayers;
       if (engineState != null) {
-        final titles = engineState['titles'] as Map<String, dynamic>? ?? {};
-        newTyping = state.typingPlayers.where((id) => !titles.containsKey(id)).toList();
+        final titles = engineState['titles'] as List<dynamic>? ?? [];
+        final submittedIds = titles.map((t) => t['author_id'] as String).toSet();
+        newTyping = state.typingPlayers.where((id) => !submittedIds.contains(id)).toList();
       }
       state = state.copyWith(engineState: engineState, typingPlayers: newTyping);
     } else if (eventType == 'PLAYERS_UPDATED') {

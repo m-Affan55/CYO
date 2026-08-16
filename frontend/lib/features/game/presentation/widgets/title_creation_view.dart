@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/primary_button.dart';
 
 class TitleCreationView extends StatefulWidget {
-  final bool hasSubmitted;
-  final int titlesSubmitted;
   final int totalPlayers;
-  final Map<String, dynamic> titlesMap;
+  final List<dynamic> titles;
   final List<dynamic> players;
   final List<String> typingNames;
+  final String myUserId;
+  final bool isHost;
   final Function(String) onTitleSubmit;
   final Function(bool) onTyping;
+  final VoidCallback onStartGame;
 
   const TitleCreationView({
     super.key,
-    required this.hasSubmitted,
-    required this.titlesSubmitted,
     required this.totalPlayers,
-    required this.titlesMap,
+    required this.titles,
     required this.players,
     required this.typingNames,
+    required this.myUserId,
+    required this.isHost,
     required this.onTitleSubmit,
     required this.onTyping,
+    required this.onStartGame,
   });
 
   @override
@@ -53,13 +56,18 @@ class _TitleCreationViewState extends State<TitleCreationView> {
   }
 
   void _submit() {
-    if (_controller.text.trim().isNotEmpty && !widget.hasSubmitted) {
+    if (_controller.text.trim().isNotEmpty) {
       widget.onTitleSubmit(_controller.text.trim());
+      _controller.clear();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final uniqueSubmitters = widget.titles.map((t) => t['author_id'] as String).toSet();
+    final canStart = uniqueSubmitters.length >= widget.totalPlayers && widget.totalPlayers >= 3;
+    final myTitlesCount = widget.titles.where((t) => t['author_id'] == widget.myUserId).length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,51 +80,43 @@ class _TitleCreationViewState extends State<TitleCreationView> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Add a title to the pool.',
+          'Add titles to the pool.',
           style: Theme.of(context).textTheme.displayMedium,
         ),
         const SizedBox(height: 8),
         Text(
-          'Everyone needs to submit one title to start.',
+          'Everyone must submit at least 1 title.\nYou have submitted $myTitlesCount title(s).',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
         ),
         const SizedBox(height: 32),
         
-        if (!widget.hasSubmitted) ...[
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  decoration: InputDecoration(
-                    hintText: 'E.g., "Always Late"',
-                    filled: true,
-                    fillColor: AppTheme.surfaceCharcoal,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2A))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2A))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryRed)),
-                  ),
-                  onSubmitted: (_) => _submit(),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                decoration: InputDecoration(
+                  hintText: 'E.g., "Always Late"',
+                  filled: true,
+                  fillColor: AppTheme.surfaceCharcoal,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2A))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2A))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryRed)),
                 ),
+                onSubmitted: (_) => _submit(),
               ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: _submit,
-                child: Container(
-                  height: 56, width: 56,
-                  decoration: BoxDecoration(color: AppTheme.primaryRed, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.send, color: AppTheme.textPrimary),
-                ),
-              )
-            ],
-          ),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: AppTheme.surfaceCharcoal, borderRadius: BorderRadius.circular(12)),
-            child: const Center(child: Text("Title submitted! Waiting for others...")),
-          ),
-        ],
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: _submit,
+              child: Container(
+                height: 56, width: 56,
+                decoration: BoxDecoration(color: AppTheme.primaryRed, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.send, color: AppTheme.textPrimary),
+              ),
+            )
+          ],
+        ),
         
         if (widget.typingNames.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -141,32 +141,15 @@ class _TitleCreationViewState extends State<TitleCreationView> {
         
         const SizedBox(height: 32),
         
-        // Progress
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Pool Progress', style: Theme.of(context).textTheme.labelLarge),
-            Text('${widget.titlesSubmitted} / ${widget.totalPlayers}', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.primaryRed)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: widget.totalPlayers == 0 ? 0 : widget.titlesSubmitted / widget.totalPlayers,
-          backgroundColor: AppTheme.surfaceCharcoal,
-          valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryRed),
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        const SizedBox(height: 32),
-        
         // List of added titles
         Expanded(
           child: ListView.separated(
-            itemCount: widget.titlesMap.length,
+            itemCount: widget.titles.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final authorId = widget.titlesMap.keys.elementAt(index);
-              final title = widget.titlesMap.values.elementAt(index);
+              final titleObj = widget.titles[index];
+              final authorId = titleObj['author_id'];
+              final titleText = titleObj['text'];
               
               String authorName = 'Unknown';
               final authorData = widget.players.cast<Map<String, dynamic>>().firstWhere(
@@ -182,11 +165,30 @@ class _TitleCreationViewState extends State<TitleCreationView> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF2A2A2A)),
                 ),
-                child: Text('"$title" (by $authorName)', style: Theme.of(context).textTheme.bodyLarge),
+                child: Text('"$titleText" (by $authorName)', style: Theme.of(context).textTheme.bodyLarge),
               );
             },
           ),
         ),
+        
+        if (widget.isHost) ...[
+          const SizedBox(height: 16),
+          PrimaryButton(
+            text: canStart ? 'Start Game' : 'Waiting for everyone to submit...',
+            onPressed: canStart ? widget.onStartGame : () {},
+            color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
+          ),
+        ] else ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            alignment: Alignment.center,
+            child: Text(
+              canStart ? 'Waiting for host to start...' : 'Waiting for everyone to submit...',
+              style: const TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
       ],
     );
   }
