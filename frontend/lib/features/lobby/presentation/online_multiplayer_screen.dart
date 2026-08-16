@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/providers/game_provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/primary_button.dart';
 
 class OnlineMultiplayerScreen extends ConsumerStatefulWidget {
   const OnlineMultiplayerScreen({super.key});
@@ -61,48 +62,6 @@ class _OnlineMultiplayerScreenState extends ConsumerState<OnlineMultiplayerScree
                 description: 'Enter an invite code to jump into an existing game with friends.',
                 icon: Icons.login,
                 isPrimary: false,
-                onTap: () async {
-                  if (_isLoading) return;
-                  if (_codeController.text.length != 4) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code must be 4 letters')));
-                    return;
-                  }
-                  
-                  setState(() => _isLoading = true);
-                  try {
-                    final api = ref.read(apiServiceProvider);
-                    final response = await api.joinRoom(
-                      _codeController.text, 
-                      _nameController.text, 
-                      '#00C4B4' // Default color
-                    );
-                    
-                    ref.read(userProvider.notifier).state = UserState(
-                      id: response['id'],
-                      name: response['name'],
-                      color: response['color'],
-                      roomId: response['room_id'],
-                    );
-                    
-                    // Note: Ideally we'd fetch the room data to set in GameState.
-                    // For MVP, we'll just set the roomCode.
-                    ref.read(gameStateProvider.notifier).setRoomData({'id': response['room_id']});
-                    
-                    final ws = ref.read(webSocketServiceProvider);
-                    ws.onMessageReceived = (event) {
-                      ref.read(gameStateProvider.notifier).handleWebSocketEvent(event);
-                    };
-                    ws.connect(response['room_id'], response['id']);
-                    
-                    if (!context.mounted) return;
-                    context.push('/game-lobby', extra: {'isSecretMode': false});
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                  } finally {
-                    if (mounted) setState(() => _isLoading = false);
-                  }
-                },
                 child: Padding(
                   padding: const EdgeInsets.only(top: 16.0),
                   child: Column(
@@ -128,6 +87,50 @@ class _OnlineMultiplayerScreenState extends ConsumerState<OnlineMultiplayerScree
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      PrimaryButton(
+                        text: _isLoading ? 'Joining...' : 'Join Game',
+                        onPressed: () async {
+                          if (_isLoading) return;
+                          if (_codeController.text.length != 4) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code must be 4 letters')));
+                            return;
+                          }
+                          
+                          setState(() => _isLoading = true);
+                          try {
+                            final api = ref.read(apiServiceProvider);
+                            final response = await api.joinRoom(
+                              _codeController.text, 
+                              _nameController.text, 
+                              '#00C4B4' // Default color
+                            );
+                            
+                            ref.read(userProvider.notifier).state = UserState(
+                              id: response['id'],
+                              name: response['name'],
+                              color: response['color'],
+                              roomId: response['room_id'],
+                            );
+                            
+                            ref.read(gameStateProvider.notifier).setRoomData({'id': response['room_id']});
+                            
+                            final ws = ref.read(webSocketServiceProvider);
+                            ws.onMessageReceived = (event) {
+                              ref.read(gameStateProvider.notifier).handleWebSocketEvent(event);
+                            };
+                            ws.connect(response['room_id'], response['id']);
+                            
+                            if (!context.mounted) return;
+                            context.push('/game-lobby', extra: {'isSecretMode': false});
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                          } finally {
+                            if (mounted) setState(() => _isLoading = false);
+                          }
+                        }
+                      )
                     ],
                   ),
                 ),
@@ -146,7 +149,7 @@ class _ActionCard extends StatelessWidget {
   final String description;
   final IconData icon;
   final bool isPrimary;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Widget? child;
 
   const _ActionCard({
@@ -154,63 +157,65 @@ class _ActionCard extends StatelessWidget {
     required this.description,
     required this.icon,
     this.isPrimary = false,
-    required this.onTap,
+    this.onTap,
     this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceCharcoal,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isPrimary ? AppTheme.primaryRed.withOpacity(0.5) : const Color(0xFF2A2A2A),
-            width: 1,
+    Widget cardContent = Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCharcoal,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPrimary ? AppTheme.primaryRed.withOpacity(0.5) : const Color(0xFF2A2A2A),
+          width: 1,
+        ),
+        boxShadow: isPrimary
+            ? [
+                BoxShadow(
+                  color: AppTheme.primaryRed.withOpacity(0.05),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                )
+              ]
+            : [],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isPrimary ? AppTheme.primaryRed : AppTheme.backgroundBlack,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: AppTheme.textPrimary,
+            ),
           ),
-          boxShadow: isPrimary
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryRed.withOpacity(0.05),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  )
-                ]
-              : [],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isPrimary ? AppTheme.primaryRed : AppTheme.backgroundBlack,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: AppTheme.textPrimary,
-              ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+              fontSize: 20,
             ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                fontSize: 20,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            if (child != null) child!,
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (child != null) child!,
+        ],
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(onTap: onTap, child: cardContent);
+    }
+    return cardContent;
   }
 }

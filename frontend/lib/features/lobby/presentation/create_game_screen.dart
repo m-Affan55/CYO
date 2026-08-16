@@ -17,11 +17,11 @@ class _CreateGameScreenState extends ConsumerState<CreateGameScreen> {
   bool _isLoading = false;
   int _maxPlayers = 6;
   int _selectedRounds = 3;
-  int _selectedTimer = 30; // Max 30 seconds
+  int _selectedTimer = 15;
   bool _isSecretMode = false;
 
   final List<int> _roundOptions = [1, 2, 3, 5];
-  final List<int> _timerOptions = [15, 20, 30];
+  final List<int> _timerOptions = [10, 15, 20];
 
   @override
   void dispose() {

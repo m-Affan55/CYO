@@ -34,18 +34,22 @@ class ConnectionManager:
     async def broadcast_to_room(self, room_id: str, message: dict):
         """Send a JSON payload to all connected users in a room."""
         if room_id in self.active_connections:
-            dead_connections = []
-            for user_id, connection in self.active_connections[room_id].items():
+            import asyncio
+            async def send_to_user(user_id, connection):
                 try:
                     await connection.send_json(message)
+                    return None
                 except Exception as e:
                     logger.error(f"Error sending message to user {user_id} in room {room_id}: {e}")
-                    # Keep track of dead connections to remove them
-                    dead_connections.append(user_id)
+                    return user_id
+
+            tasks = [send_to_user(uid, conn) for uid, conn in self.active_connections[room_id].items()]
+            results = await asyncio.gather(*tasks)
             
             # Clean up dead connections
-            for user_id in dead_connections:
-                self.disconnect(room_id, user_id)
+            for dead_uid in results:
+                if dead_uid:
+                    self.disconnect(room_id, dead_uid)
 
     def get_connected_users(self, room_id: str) -> list[str]:
         """Return a list of user IDs currently connected to the room."""

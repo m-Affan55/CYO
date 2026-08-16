@@ -57,18 +57,17 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(opacity: animation, child: child);
             },
-            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id, gameState.typingPlayers),
+            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id, gameState.typingPlayers, gameState.hostId),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId, List<String> typingPlayers) {
+  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId, List<String> typingPlayers, String hostId) {
     switch (phase) {
       case 'TITLE_CREATION':
-        final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
-        final hasSubmitted = titlesMap.containsKey(myUserId);
+        final titles = engineState['titles'] as List<dynamic>? ?? [];
         
         final typingNames = typingPlayers
             .where((id) => id != myUserId)
@@ -77,12 +76,12 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
 
         return TitleCreationView(
           key: const ValueKey('titleCreation'),
-          hasSubmitted: hasSubmitted,
-          titlesSubmitted: titlesMap.length,
           totalPlayers: players.length,
-          titlesMap: titlesMap,
+          titles: titles,
           players: players,
           typingNames: typingNames,
+          myUserId: myUserId,
+          isHost: myUserId == hostId,
           onTitleSubmit: (title) {
             final ws = ref.read(webSocketServiceProvider);
             ws.sendAction('SUBMIT_TITLE', {'title': title});
@@ -90,67 +89,71 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           onTyping: (isTyping) {
             final ws = ref.read(webSocketServiceProvider);
             ws.sendAction('TYPING', {'is_typing': isTyping});
+          },
+          onStartGame: () {
+            final ws = ref.read(webSocketServiceProvider);
+            ws.sendAction('START_ROUND');
           }
         );
       
       case 'SELECTING_ASSIGNER':
-        // For MVP, if there is no assigner picked yet, anyone can click a button to pick an assigner.
-        // Usually, the server picks randomly, or host presses. Let's just give everyone a button.
-        final assignerId = engineState['assigner_id'];
-        
-        if (assignerId == null) {
-            return Center(
-              child: PrimaryButton(
-                text: 'Spin Assigner Wheel',
-                onPressed: () {
-                   // Just pick self for MVP demo, or random
-                   final ws = ref.read(webSocketServiceProvider);
-                   ws.sendAction('SELECT_ASSIGNER', {'assigner_id': myUserId});
-                }
-              )
-            );
-        } else {
-            // This is just a transition phase
-            final text = widget.isSecretMode
-                ? "An assigner was selected!"
-                : "Assigner selected: ${_getPlayerName(players, assignerId)}";
-            return Center(child: Text(text));
-        }
+        return Center(
+          key: const ValueKey('SELECTING_ASSIGNER'),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: AppTheme.primaryRed),
+              const SizedBox(height: 32),
+              Text('Selecting Assigner...', style: Theme.of(context).textTheme.displayMedium),
+            ],
+          ),
+        );
 
       case 'SELECTING_TARGET':
+        return Center(
+          key: const ValueKey('SELECTING_TARGET'),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: AppTheme.primaryRed),
+              const SizedBox(height: 32),
+              Text('Selecting Target...', style: Theme.of(context).textTheme.displayMedium),
+            ],
+          ),
+        );
+
       case 'TITLE_SELECTION':
         final assignerId = engineState['assigner_id'];
+        final targetId = engineState['target_id'];
         final amIAssigner = (assignerId == myUserId);
         final assignerName = _getPlayerName(players, assignerId);
+        final targetName = _getPlayerName(players, targetId);
         
         if (amIAssigner) {
-          // I am picking the target and title
-          final titlesMap = engineState['titles'] as Map<String, dynamic>? ?? {};
-          final availableTitles = titlesMap.values.cast<String>().toList();
-          
-          // Target selection mock: Just pick first other player
-          final possibleTargets = players.where((p) => p['id'] != myUserId).toList();
-          final targetId = possibleTargets.isNotEmpty ? possibleTargets.first['id'] : myUserId;
-          final targetName = _getPlayerName(players, targetId);
+          final titles = engineState['titles'] as List<dynamic>? ?? [];
+          final usedTitles = List<String>.from(engineState['used_titles'] ?? []);
+          final availableTitles = titles
+              .map((t) => t['text'] as String)
+              .where((text) => !usedTitles.contains(text))
+              .toList();
           
           return TitleSelectionView(
-            key: const ValueKey('titleSelection'),
+            key: const ValueKey('TITLE_SELECTION_ASSIGNER'),
             assignerName: 'You',
             targetName: targetName,
             availableTitles: availableTitles,
             onTitleSelected: (title) {
               final ws = ref.read(webSocketServiceProvider);
               ws.sendAction('ASSIGN_TITLE', {
-                  'target_id': targetId,
                   'title': title
               });
             },
           );
         } else {
           final text = widget.isSecretMode
-              ? "Someone is picking a target and title..."
-              : "$assignerName is picking a target and title...";
-          return Center(child: Text(text));
+              ? "Someone is picking a title for $targetName..."
+              : "$assignerName is picking a title for $targetName...";
+          return Center(key: const ValueKey('TITLE_SELECTION_WAITING'), child: Text(text));
         }
 
       case 'VOTING':
@@ -158,12 +161,14 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         final assignerId = engineState['assigner_id'];
         final title = engineState['selected_title'];
         final targetName = _getPlayerName(players, targetId);
+        final votingEndsAt = (engineState['voting_ends_at'] as num?)?.toDouble();
         
         final amITarget = (targetId == myUserId);
         final amIAssigner = (assignerId == myUserId);
         
         if (amITarget || amIAssigner) {
            return Center(
+             key: const ValueKey('VOTING_WAITING'),
              child: Column(
                mainAxisAlignment: MainAxisAlignment.center,
                children: [
@@ -179,26 +184,29 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           key: const ValueKey('voting'),
           targetName: targetName,
           title: title ?? '',
+          votingEndsAt: votingEndsAt,
           onVote: (vote) {
             final ws = ref.read(webSocketServiceProvider);
-            bool boolVote = vote == 'agree'; // Maps agree to true, otherwise false
-            ws.sendAction('VOTE', {'vote': boolVote});
+            ws.sendAction('VOTE', {'vote': vote});
           },
         );
 
       case 'ROUND_RESULTS':
-        return _buildResultsView(engineState, players);
+      case 'GAME_OVER':
+        return _buildResultsView(phase, engineState, players);
         
       default:
-        return const Center(child: CircularProgressIndicator());
+        return Center(key: const ValueKey('DEFAULT'), child: const CircularProgressIndicator());
     }
   }
 
-  Widget _buildResultsView(Map<String, dynamic> engineState, List<dynamic> players) {
-    // Note: To properly show results we need the latest points, which means we might need a fetch or the server sends it.
-    // For MVP, we'll just show a "Round Over" placeholder since points are updated in DB.
+  Widget _buildResultsView(String phase, Map<String, dynamic> engineState, List<dynamic> players) {
+    // Sort players by score
+    final sortedPlayers = List<dynamic>.from(players);
+    sortedPlayers.sort((a, b) => (b['score'] ?? 0).compareTo(a['score'] ?? 0));
+    
     return Center(
-      key: const ValueKey('results'),
+      key: ValueKey(phase),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -209,22 +217,41 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'ROUND COMPLETE',
+              phase == 'GAME_OVER' ? 'GAME OVER' : 'ROUND COMPLETE',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.successGreen, letterSpacing: 2),
             ),
           ),
           const SizedBox(height: 32),
-          Text(
-            "Points updated in database!",
-            style: Theme.of(context).textTheme.displayMedium,
+          Text('Leaderboard', style: Theme.of(context).textTheme.displayMedium),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView.builder(
+              itemCount: sortedPlayers.length,
+              itemBuilder: (context, index) {
+                final p = sortedPlayers[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppTheme.primaryRed.withOpacity(0.2),
+                    child: Text('${index + 1}', style: const TextStyle(color: AppTheme.primaryRed)),
+                  ),
+                  title: Text(p['name']),
+                  trailing: Text('${p['score'] ?? 0} pts', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary)),
+                );
+              },
+            ),
           ),
-          const SizedBox(height: 64),
-          PrimaryButton(
-            text: 'End Game (MVP)',
-            onPressed: () {
-               context.go('/home');
-            },
-          ),
+          if (phase == 'GAME_OVER')
+            PrimaryButton(
+              text: 'Return to Lobby',
+              onPressed: () {
+                 context.go('/home');
+              },
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Next round starting soon...', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
+            ),
         ],
       ),
     );
