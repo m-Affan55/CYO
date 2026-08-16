@@ -57,14 +57,14 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(opacity: animation, child: child);
             },
-            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id, gameState.typingPlayers),
+            child: _buildCurrentPhase(phase, engineState, gameState.players, user.id, gameState.typingPlayers, gameState.hostId),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId, List<String> typingPlayers) {
+  Widget _buildCurrentPhase(String phase, Map<String, dynamic> engineState, List<dynamic> players, String myUserId, List<String> typingPlayers, String hostId) {
     switch (phase) {
       case 'TITLE_CREATION':
         final titles = engineState['titles'] as List<dynamic>? ?? [];
@@ -81,7 +81,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           players: players,
           typingNames: typingNames,
           myUserId: myUserId,
-          isHost: user.id == gameState.hostId,
+          isHost: myUserId == hostId,
           onTitleSubmit: (title) {
             final ws = ref.read(webSocketServiceProvider);
             ws.sendAction('SUBMIT_TITLE', {'title': title});
