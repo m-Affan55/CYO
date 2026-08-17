@@ -1,3 +1,5 @@
+import random
+import string
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -22,6 +24,34 @@ async def register(user_in: AccountCreate, db: AsyncSession = Depends(get_db)):
         password_hash=hashed_password,
         color=user_in.color,
         status=user_in.status
+    )
+    db.add(new_account)
+    await db.commit()
+    await db.refresh(new_account)
+    
+    access_token = create_access_token(data={"username": new_account.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/guest", response_model=Token)
+async def register_guest(db: AsyncSession = Depends(get_db)):
+    # Generate unique guest name
+    while True:
+        random_suffix = ''.join(random.choices(string.digits, k=4))
+        username = f"Guest_{random_suffix}"
+        res = await db.execute(select(Account).where(Account.username == username))
+        if not res.scalar_one_or_none():
+            break
+            
+    # Random color from the predefined list
+    colors = ['#FF3B30', '#6B4EFF', '#00C4B4', '#FF9500', '#34C759', '#AF52DE']
+    color = random.choice(colors)
+    
+    hashed_password = get_password_hash("guest_dummy_password")
+    new_account = Account(
+        username=username,
+        password_hash=hashed_password,
+        color=color,
+        status="Just visiting"
     )
     db.add(new_account)
     await db.commit()

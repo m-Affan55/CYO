@@ -41,6 +41,20 @@ class AuthService {
       throw Exception('Failed to register: ${response.body}');
     }
   }
+  Future<Map<String, dynamic>> registerGuest() async {
+    final response = await http.post(
+      Uri.parse('${ApiService.baseUrl}/auth/guest'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      await saveToken(data['access_token']);
+      return data;
+    } else {
+      throw Exception('Failed to register guest: ${response.body}');
+    }
+  }
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http.post(
