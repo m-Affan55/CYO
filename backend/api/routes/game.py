@@ -84,7 +84,7 @@ async def start_selection_timer(room_id: str):
         return
 
     async def _timer():
-        await asyncio.sleep(60)
+        await asyncio.sleep(30)
         current_state = engine.get_state(room_id)
         if not current_state:
             return

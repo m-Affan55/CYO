@@ -262,20 +262,11 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         } else {
           // BUG-12: In secret mode, hide the assigner's name
           final displayName = secretMode ? 'Someone' : assignerName;
-          return Center(
+          return _TitleSelectionWaitingView(
             key: const ValueKey('TITLE_SELECTION_WAITING'),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(color: AppTheme.primaryRed),
-                const SizedBox(height: 32),
-                Text(
-                  '$displayName is picking a title for $targetName...',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displayMedium,
-                ),
-              ],
-            ),
+            displayName: displayName,
+            targetName: targetName,
+            timeoutSeconds: 30,
           );
         }
 
@@ -506,8 +497,6 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
   }
 }
 
-// ─── Small helper widget ──────────────────────────────────────────────────────
-
 class _VoteCountBadge extends StatelessWidget {
   final String label;
   final int count;
@@ -525,6 +514,133 @@ class _VoteCountBadge extends StatelessWidget {
         ),
         Text(label, style: TextStyle(color: color, fontSize: 12)),
       ],
+    );
+  }
+}
+
+// ─── Waiting view with countdown ─────────────────────────────────────────────
+
+class _TitleSelectionWaitingView extends StatefulWidget {
+  final String displayName;
+  final String targetName;
+  final int timeoutSeconds;
+
+  const _TitleSelectionWaitingView({
+    super.key,
+    required this.displayName,
+    required this.targetName,
+    required this.timeoutSeconds,
+  });
+
+  @override
+  State<_TitleSelectionWaitingView> createState() => _TitleSelectionWaitingViewState();
+}
+
+class _TitleSelectionWaitingViewState extends State<_TitleSelectionWaitingView>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  int _secondsLeft = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _secondsLeft = widget.timeoutSeconds;
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: widget.timeoutSeconds),
+    )..forward();
+
+    // Tick every second to update the counter label
+    _controller.addListener(() {
+      final remaining = (widget.timeoutSeconds * (1.0 - _controller.value)).ceil();
+      if (remaining != _secondsLeft && mounted) {
+        setState(() => _secondsLeft = remaining);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated icon
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryRed.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.primaryRed.withOpacity(0.4), width: 2),
+              ),
+              child: const Icon(Icons.hourglass_top_rounded, color: AppTheme.primaryRed, size: 36),
+            ),
+            const SizedBox(height: 28),
+
+            // Main message
+            Text(
+              '${widget.displayName} is picking a title for ${widget.targetName}...',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.displayMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Auto-pick in $_secondsLeft seconds if they take too long',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textMuted,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Countdown progress bar
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final progress = 1.0 - _controller.value;
+                final barColor = progress > 0.5
+                    ? AppTheme.primaryRed
+                    : progress > 0.25
+                        ? Colors.orange
+                        : Colors.redAccent;
+
+                return Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: AppTheme.surfaceCharcoal,
+                        valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$_secondsLeft s',
+                      style: TextStyle(
+                        color: barColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
