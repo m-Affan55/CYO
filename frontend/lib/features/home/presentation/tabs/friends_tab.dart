@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/providers/auth_provider.dart';
@@ -45,60 +46,7 @@ class _FriendsTabState extends ConsumerState<FriendsTab> {
     }
   }
 
-  Future<void> _sendFriendRequest(String username) async {
-    try {
-      final token = await ref.read(authServiceProvider).getToken();
-      final response = await http.post(
-        Uri.parse('${ApiService.baseUrl}/friends/request/$username'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
-      
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Friend request sent!')));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${response.body}')));
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
-  }
 
-  void _showAddFriendDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCharcoal,
-        title: const Text('Add Friend', style: TextStyle(color: AppTheme.textPrimary)),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Enter username',
-            hintStyle: TextStyle(color: AppTheme.textMuted),
-          ),
-          style: const TextStyle(color: AppTheme.textPrimary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (controller.text.isNotEmpty) {
-                _sendFriendRequest(controller.text);
-              }
-            },
-            child: const Text('Add', style: TextStyle(color: AppTheme.primaryRed)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +64,7 @@ class _FriendsTabState extends ConsumerState<FriendsTab> {
               ),
               IconButton(
                 icon: const Icon(Icons.person_add, color: AppTheme.textPrimary),
-                onPressed: _showAddFriendDialog,
+                onPressed: () => context.push('/search-friends'),
               )
             ],
           ),

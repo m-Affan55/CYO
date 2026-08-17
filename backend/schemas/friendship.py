@@ -16,3 +16,6 @@ class FriendshipResponse(BaseModel):
 class FriendResponse(BaseModel):
     friend_account: AccountResponse
     status: str
+
+class SearchAccountResponse(AccountResponse):
+    friendship_status: str
