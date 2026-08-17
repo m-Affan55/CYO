@@ -51,6 +51,9 @@ class GameState {
   // BUG-4: game aborted flag + message
   final bool isAborted;
   final String abortMessage;
+  
+  final int requiredTitles;
+  final List<dynamic> turnHistory;
 
   const GameState({
     this.roomCode = '',
@@ -63,6 +66,8 @@ class GameState {
     this.maxPlayers = 12,
     this.isAborted = false,
     this.abortMessage = '',
+    this.requiredTitles = 1,
+    this.turnHistory = const [],
   });
 
   GameState copyWith({
@@ -76,6 +81,8 @@ class GameState {
     int? maxPlayers,
     bool? isAborted,
     String? abortMessage,
+    int? requiredTitles,
+    List<dynamic>? turnHistory,
   }) {
     return GameState(
       roomCode: roomCode ?? this.roomCode,
@@ -88,6 +95,8 @@ class GameState {
       maxPlayers: maxPlayers ?? this.maxPlayers,
       isAborted: isAborted ?? this.isAborted,
       abortMessage: abortMessage ?? this.abortMessage,
+      requiredTitles: requiredTitles ?? this.requiredTitles,
+      turnHistory: turnHistory ?? this.turnHistory,
     );
   }
 
@@ -129,7 +138,11 @@ class GameStateNotifier extends StateNotifier<GameState> {
           final submittedIds = titles.map((t) => t['author_id'] as String).toSet();
           newTyping = state.typingPlayers.where((id) => !submittedIds.contains(id)).toList();
         }
-        state = state.copyWith(engineState: engineState, typingPlayers: newTyping);
+        state = state.copyWith(
+          engineState: engineState, 
+          typingPlayers: newTyping,
+          turnHistory: engineState?['turn_history'] as List<dynamic>? ?? state.turnHistory,
+        );
         break;
 
       case 'PLAYERS_UPDATED':
@@ -139,7 +152,8 @@ class GameStateNotifier extends StateNotifier<GameState> {
       case 'GAME_STARTED':
         // BUG-12: Capture secret_mode from server for all clients
         final secretMode = event['secret_mode'] as bool? ?? false;
-        state = state.copyWith(status: 'PLAYING', secretMode: secretMode);
+        final requiredTitles = event['rounds'] as int? ?? 1;
+        state = state.copyWith(status: 'PLAYING', secretMode: secretMode, requiredTitles: requiredTitles);
         break;
 
       case 'TITLE_ADDED':

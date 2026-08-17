@@ -372,6 +372,7 @@ async def handle_start_game(data: dict, room_id: str, user_id: str):
     await manager.broadcast_to_room(room_id, {
         "event": "GAME_STARTED",
         "secret_mode": secret_mode,
+        "rounds": max_rounds,
     })
     await broadcast_state(room_id)
 

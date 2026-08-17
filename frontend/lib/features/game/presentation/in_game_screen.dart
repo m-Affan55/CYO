@@ -145,7 +145,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
                 transitionBuilder: (child, animation) =>
                     FadeTransition(opacity: animation, child: child),
                 child: _buildCurrentPhase(phase, engineState, gameState.players, user.id,
-                    gameState.typingPlayers, gameState.hostId, secretMode),
+                    gameState.typingPlayers, gameState.hostId, secretMode, gameState),
               ),
             ),
             // BUG-15: AFK skip toast
@@ -186,6 +186,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
     List<String> typingPlayers,
     String hostId,
     bool secretMode,
+    GameState gameState,
   ) {
     switch (phase) {
       case 'TITLE_CREATION':
@@ -203,6 +204,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
           typingNames: typingNames,
           myUserId: myUserId,
           isHost: myUserId == hostId,
+          requiredTitles: gameState.requiredTitles,
           onTitleSubmit: (title) => ref.read(webSocketServiceProvider).sendAction('SUBMIT_TITLE', {'title': title}),
           onTyping: (isTyping) => ref.read(webSocketServiceProvider).sendAction('TYPING', {'is_typing': isTyping}),
           onStartGame: () => ref.read(webSocketServiceProvider).sendAction('START_ROUND'),
@@ -211,6 +213,9 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
         );
 
       case 'SELECTING_ASSIGNER':
+        final turn = engineState['turn'] as int? ?? 0;
+        final turnsPerRound = engineState['turns_per_round'] as int? ?? 0;
+        final turnText = turnsPerRound > 0 ? 'Turn $turn of $turnsPerRound — Selecting Assigner...' : 'Selecting Assigner...';
         return Center(
           key: const ValueKey('SELECTING_ASSIGNER'),
           child: Column(
@@ -218,12 +223,15 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             children: [
               const CircularProgressIndicator(color: AppTheme.primaryRed),
               const SizedBox(height: 32),
-              Text('Selecting Assigner...', style: Theme.of(context).textTheme.displayMedium),
+              Text(turnText, style: Theme.of(context).textTheme.displayMedium, textAlign: TextAlign.center),
             ],
           ),
         );
 
       case 'SELECTING_TARGET':
+        final turn = engineState['turn'] as int? ?? 0;
+        final turnsPerRound = engineState['turns_per_round'] as int? ?? 0;
+        final turnText = turnsPerRound > 0 ? 'Turn $turn of $turnsPerRound — Selecting Target...' : 'Selecting Target...';
         return Center(
           key: const ValueKey('SELECTING_TARGET'),
           child: Column(
@@ -231,7 +239,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             children: [
               const CircularProgressIndicator(color: AppTheme.primaryRed),
               const SizedBox(height: 32),
-              Text('Selecting Target...', style: Theme.of(context).textTheme.displayMedium),
+              Text(turnText, style: Theme.of(context).textTheme.displayMedium, textAlign: TextAlign.center),
             ],
           ),
         );
@@ -304,7 +312,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
 
       case 'ROUND_RESULTS':
       case 'GAME_OVER':
-        return _buildResultsView(phase, engineState, players, myUserId == hostId);
+        return _buildResultsView(phase, engineState, players, myUserId == hostId, gameState.turnHistory);
 
       default:
         return Center(key: const ValueKey('DEFAULT'), child: const CircularProgressIndicator());
@@ -313,7 +321,7 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
 
   // ─── MISSING-3: Turn summary + leaderboard ────────────────────────────────
 
-  Widget _buildResultsView(String phase, Map<String, dynamic> engineState, List<dynamic> players, bool isHost) {
+  Widget _buildResultsView(String phase, Map<String, dynamic> engineState, List<dynamic> players, bool isHost, List<dynamic> turnHistory) {
     final sortedPlayers = List<dynamic>.from(players)
       ..sort((a, b) => (b['score'] ?? 0).compareTo(a['score'] ?? 0));
 
@@ -406,10 +414,50 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
             const SizedBox(height: 20),
           ],
 
+          if (phase == 'GAME_OVER' && turnHistory.isNotEmpty) ...[
+            Text('Turn Recap', style: Theme.of(context).textTheme.displayMedium),
+            const SizedBox(height: 8),
+            Expanded(
+              flex: 1,
+              child: ListView.builder(
+                itemCount: turnHistory.length,
+                itemBuilder: (context, index) {
+                  final result = turnHistory[index];
+                  final assignerName = _getPlayerName(players, result['assigner_id']);
+                  final targetName = _getPlayerName(players, result['target_id']);
+                  final title = result['selected_title'];
+                  final agrees = result['agree_count'] ?? 0;
+                  final disagrees = result['disagree_count'] ?? 0;
+                  final majority = result['majority_agrees'] == true;
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceCharcoal,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: majority ? AppTheme.successGreen.withOpacity(0.3) : AppTheme.primaryRed.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('$assignerName gave "$title" to $targetName', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 4),
+                        Text('Result: ${majority ? 'Agreed' : 'Disagreed'} ($agrees-$disagrees)', style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // Leaderboard
           Text('Leaderboard', style: Theme.of(context).textTheme.displayMedium),
           const SizedBox(height: 16),
           Expanded(
+            flex: phase == 'GAME_OVER' ? 1 : 2,
             child: ListView.builder(
               itemCount: sortedPlayers.length,
               itemBuilder: (context, index) {

@@ -10,6 +10,7 @@ class TitleCreationView extends StatefulWidget {
   final List<String> typingNames;
   final String myUserId;
   final bool isHost;
+  final int requiredTitles;
   final Function(String) onTitleSubmit;
   final Function(bool) onTyping;
   final VoidCallback onStartGame;
@@ -23,6 +24,7 @@ class TitleCreationView extends StatefulWidget {
     required this.typingNames,
     required this.myUserId,
     required this.isHost,
+    required this.requiredTitles,
     required this.onTitleSubmit,
     required this.onTyping,
     required this.onStartGame,
@@ -84,10 +86,15 @@ class _TitleCreationViewState extends State<TitleCreationView> {
     final uniqueSubmitters = widget.titles.map((t) => t['author_id'] as String).toSet();
 
     // BUG-14: canStart counts only CONNECTED players, not disconnected ones
-    final connectedCount = widget.players
-        .where((p) => p['is_connected'] == true)
-        .length;
-    final canStart = uniqueSubmitters.length >= connectedCount && connectedCount >= 3;
+    final connectedPlayers = widget.players.where((p) => p['is_connected'] == true).toList();
+    final connectedCount = connectedPlayers.length;
+    
+    final readyCount = connectedPlayers.where((p) {
+      final count = widget.titles.where((t) => t['author_id'] == p['id']).length;
+      return count >= widget.requiredTitles;
+    }).length;
+
+    final canStart = readyCount == connectedCount && connectedCount >= 3;
 
     final myTitlesCount = widget.titles.where((t) => t['author_id'] == widget.myUserId).length;
 
@@ -95,7 +102,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
     final majority = (connectedCount ~/ 2) + 1;
     final canForceStart = _forceStartAvailable &&
         widget.isHost &&
-        uniqueSubmitters.length >= majority &&
+        readyCount >= majority &&
         !canStart;
 
     return Column(
@@ -115,7 +122,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Everyone must submit at least 1 title.\nYou have submitted $myTitlesCount title(s).',
+          'Each player must submit ${widget.requiredTitles} title(s) (= number of rounds).\nYou have submitted $myTitlesCount / ${widget.requiredTitles} title(s).',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
         ),
         const SizedBox(height: 32),
@@ -204,7 +211,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
         if (widget.isHost) ...[
           const SizedBox(height: 16),
           PrimaryButton(
-            text: canStart ? 'Start Game' : 'Waiting for everyone to submit... (${ uniqueSubmitters.length}/$connectedCount)',
+            text: canStart ? 'Start Game' : 'Waiting for everyone to submit... ($readyCount/$connectedCount ready)',
             onPressed: canStart ? widget.onStartGame : () {},
             color: canStart ? AppTheme.primaryRed : AppTheme.surfaceCharcoal,
           ),
@@ -225,7 +232,7 @@ class _TitleCreationViewState extends State<TitleCreationView> {
                 children: [
                   const Icon(Icons.skip_next, size: 18),
                   const SizedBox(width: 8),
-                  Text('Force Start (${uniqueSubmitters.length}/$connectedCount submitted)', 
+                  Text('Force Start ($readyCount/$connectedCount ready)', 
                        style: const TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),

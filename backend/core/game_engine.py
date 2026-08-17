@@ -33,6 +33,9 @@ class GameEngine:
             # MISSING-3: last turn summary for results screen
             "last_results": None,
             "voting_ends_at": None,
+            "turn": 0,
+            "turns_per_round": len(users),
+            "turn_history": [],
         }
 
     def get_state(self, room_id: str) -> dict:
@@ -119,6 +122,7 @@ class GameEngine:
         state["assigner_id"] = assigner_id
         state["assigned_this_round"].append(assigner_id)
         state["phase"] = "SELECTING_TARGET"
+        state["turn"] += 1
         return assigner_id
 
     def select_target(self, room_id: str) -> Optional[str]:
@@ -137,6 +141,12 @@ class GameEngine:
 
         # BUG-15: Generate a new selection_timer_id every time we enter TITLE_SELECTION
         state["selection_timer_id"] = str(uuid.uuid4())
+
+        used = state.get("used_titles", [])
+        available_count = len([t for t in state["titles"] if t["text"] not in used])
+        if available_count < 3:
+            state["used_titles"] = []
+
         return target_id
 
     # ─── BUG-15: Auto-select title for AFK assigner ──────────────────────────
@@ -212,7 +222,6 @@ class GameEngine:
         state["votes"]             = {}
         state["voting_id"]         = None
         state["selection_timer_id"] = None
-        state["last_results"]      = None
         state["voting_ends_at"]    = None
 
         # Check if everyone has been assigner this round
@@ -222,6 +231,7 @@ class GameEngine:
                 return False
             state["round"] = current_round + 1
             state["assigned_this_round"] = []
+            state["turn"] = 0
 
         return True
 
@@ -290,6 +300,7 @@ class GameEngine:
 
         # MISSING-3: Persist for the results screen
         state["last_results"] = results
+        state["turn_history"].append(results)
         return results
 
     # ─── MISSING-1: Play Again ────────────────────────────────────────────────
@@ -313,6 +324,8 @@ class GameEngine:
         state["selection_timer_id"] = None
         state["last_results"]       = None
         state["voting_ends_at"]     = None
+        state["turn"]               = 0
+        state["turn_history"]       = []
         return True
 
 
