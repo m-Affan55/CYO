@@ -338,182 +338,192 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
 
     return Center(
       key: ValueKey(phase),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Phase badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.successGreen.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              phase == 'GAME_OVER' ? 'GAME OVER' : 'ROUND COMPLETE',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppTheme.successGreen, letterSpacing: 2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // MISSING-3: Turn summary card
-          if (lastResults != null && selectedTitle != null) ...[
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 24),
+            // Phase badge
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceCharcoal,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primaryRed.withOpacity(0.3)),
+                color: AppTheme.successGreen.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                children: [
-                  Text(
-                    '"$selectedTitle"',
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      color: AppTheme.primaryRed, fontSize: 18,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Was given to $targetName',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _VoteCountBadge(label: 'Agree', count: agreeCount, color: AppTheme.successGreen),
-                      _VoteCountBadge(label: 'Disagree', count: disagreeCount, color: AppTheme.primaryRed),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: (majorityAgrees ?? false) ? AppTheme.successGreen.withOpacity(0.15) : AppTheme.primaryRed.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      (majorityAgrees ?? false)
-                          ? '✓ Majority Agrees! +$targetPoints pts for target, +$assignerPoints pts for assigner'
-                          : '✗ Majority Disagrees. $assignerPoints pts for assigner',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: (majorityAgrees ?? false) ? AppTheme.successGreen : AppTheme.primaryRed,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+              child: Text(
+                phase == 'GAME_OVER' ? 'GAME OVER' : 'ROUND COMPLETE',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppTheme.successGreen, letterSpacing: 2,
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-          ],
+            const SizedBox(height: 24),
 
-          if (phase == 'GAME_OVER' && turnHistory.isNotEmpty) ...[
-            Text('Turn Recap', style: Theme.of(context).textTheme.displayMedium),
-            const SizedBox(height: 8),
-            Expanded(
-              flex: 1,
-              child: ListView.builder(
-                itemCount: turnHistory.length,
-                itemBuilder: (context, index) {
-                  final result = turnHistory[index];
-                  final assignerName = _getPlayerName(players, result['assigner_id']);
-                  final targetName = _getPlayerName(players, result['target_id']);
-                  final title = result['selected_title'];
-                  final agrees = result['agree_count'] ?? 0;
-                  final disagrees = result['disagree_count'] ?? 0;
-                  final majority = result['majority_agrees'] == true;
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceCharcoal,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: majority ? AppTheme.successGreen.withOpacity(0.3) : AppTheme.primaryRed.withOpacity(0.3)),
+            // MISSING-3: Turn summary card
+            if (lastResults != null && selectedTitle != null) ...[
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceCharcoal,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.primaryRed.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '"$selectedTitle"',
+                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                        color: AppTheme.primaryRed, fontSize: 18,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 8),
+                    Text(
+                      (majorityAgrees ?? false) ? 'Was given to $targetName' : 'Was proposed for $targetName',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        Text('$assignerName gave "$title" to $targetName', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-                        const SizedBox(height: 4),
-                        Text('Result: ${majority ? 'Agreed' : 'Disagreed'} ($agrees-$disagrees)', style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                        _VoteCountBadge(label: 'Agree', count: agreeCount, color: AppTheme.successGreen),
+                        _VoteCountBadge(label: 'Disagree', count: disagreeCount, color: AppTheme.primaryRed),
                       ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (majorityAgrees ?? false) ? AppTheme.successGreen.withOpacity(0.15) : AppTheme.primaryRed.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        (majorityAgrees ?? false)
+                            ? '✓ Majority Agrees! +$targetPoints pts for target, +$assignerPoints pts for assigner'
+                            : '✗ Majority Disagrees. $assignerPoints pts for assigner',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: (majorityAgrees ?? false) ? AppTheme.successGreen : AppTheme.primaryRed,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 20),
+            ],
 
-          // Leaderboard
-          Text('Leaderboard', style: Theme.of(context).textTheme.displayMedium),
-          const SizedBox(height: 16),
-          Expanded(
-            flex: phase == 'GAME_OVER' ? 1 : 2,
-            child: ListView.builder(
+            // Leaderboard
+            Text('Leaderboard', style: Theme.of(context).textTheme.displayMedium),
+            const SizedBox(height: 16),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: sortedPlayers.length,
               itemBuilder: (context, index) {
                 final p = sortedPlayers[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.primaryRed.withOpacity(0.2),
-                    child: Text('${index + 1}', style: const TextStyle(color: AppTheme.primaryRed)),
-                  ),
-                  title: Text(p['name']),
-                  trailing: Text(
-                    '${p['score'] ?? 0} pts',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
-                  ),
-                );
+                
+                if (phase == 'GAME_OVER') {
+                  final playerId = p['id'];
+                  // Only show titles that were successfully received via majority vote
+                  final receivedTitles = turnHistory.where((t) => t['target_id'] == playerId && t['majority_agrees'] == true).toList();
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12, left: 8, right: 8),
+                    color: AppTheme.surfaceCharcoal,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: AppTheme.primaryRed.withOpacity(0.3)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: AppTheme.primaryRed.withOpacity(0.2),
+                                child: Text('${index + 1}', style: const TextStyle(color: AppTheme.primaryRed)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(p['name'], style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                              ),
+                              Text(
+                                '${p['score'] ?? 0} pts',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.textPrimary),
+                              ),
+                            ],
+                          ),
+                          if (receivedTitles.isNotEmpty) ...[
+                            const Divider(height: 24, color: Color(0xFF2A2A2A)),
+                            Text('TITLES RECEIVED', style: TextStyle(color: AppTheme.textMuted, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            ...receivedTitles.map((t) => Text('• "${t['selected_title']}" from ${_getPlayerName(players, t['assigner_id'])}', style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary))),
+                          ]
+                        ],
+                      ),
+                    ),
+                  );
+                } else {
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primaryRed.withOpacity(0.2),
+                      child: Text('${index + 1}', style: const TextStyle(color: AppTheme.primaryRed)),
+                    ),
+                    title: Text(p['name']),
+                    trailing: Text(
+                      '${p['score'] ?? 0} pts',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
+                    ),
+                  );
+                }
               },
             ),
-          ),
 
-          // Actions
-          if (phase == 'GAME_OVER') ...[
-            if (isHost)
-              PrimaryButton(
-                text: 'Play Again',
-                onPressed: () => ref.read(webSocketServiceProvider).sendAction('RESET_GAME'),
-              )
-            else
+            const SizedBox(height: 24),
+            // Actions
+            if (phase == 'GAME_OVER') ...[
+              if (isHost)
+                PrimaryButton(
+                  text: 'Play Again',
+                  onPressed: () => ref.read(webSocketServiceProvider).sendAction('RESET_GAME'),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Waiting for host to start again...', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
+                ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    ref.read(webSocketServiceProvider).disconnect();
+                    ref.read(gameStateProvider.notifier).reset();
+                    context.go('/home');
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textMuted,
+                    side: const BorderSide(color: Color(0xFF2A2A2A)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Return to Home'),
+                ),
+              ),
+            ] else
               const Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('Waiting for host to start again...', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
+                child: Text('Next round starting soon...', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
               ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  ref.read(webSocketServiceProvider).disconnect();
-                  ref.read(gameStateProvider.notifier).reset();
-                  context.go('/home');
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.textMuted,
-                  side: const BorderSide(color: Color(0xFF2A2A2A)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Return to Home'),
-              ),
-            ),
-          ] else
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('Next round starting soon...', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
-            ),
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }

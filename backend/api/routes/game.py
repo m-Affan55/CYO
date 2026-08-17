@@ -139,6 +139,9 @@ async def process_round_results(room_id: str):
         await db.commit()
 
     await broadcast_players(room_id)
+    # NEW: Broadcast the state IMMEDIATELY so the frontend gets the new last_results
+    await broadcast_state(room_id)
+
     # MISSING-3: Send full results payload so frontend can show turn summary
     await manager.broadcast_to_room(room_id, {
         "event": "ROUND_RESULTS_COMPLETED",
