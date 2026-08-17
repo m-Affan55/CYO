@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/providers/game_provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:frontend/core/providers/auth_provider.dart';
+import 'package:frontend/core/services/api_service.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
 
 class GameLobbyScreen extends ConsumerWidget {
@@ -166,13 +170,11 @@ class GameLobbyScreen extends ConsumerWidget {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {
-                    final code = gameState.roomCode;
-                    if (code.isNotEmpty) {
-                      Clipboard.setData(ClipboardData(text: 'Join my CYO game! Code: $code'));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invite code copied to clipboard!')),
-                      );
-                    }
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: AppTheme.backgroundBlack,
+                      builder: (context) => _InviteFriendsSheet(roomCode: gameState.roomCode),
+                    );
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.textPrimary,
@@ -181,7 +183,7 @@ class GameLobbyScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: AppTheme.surfaceCharcoal,
                   ),
-                  child: const Text('+ Invite More Friends'),
+                  child: const Text('+ Invite Friends'),
                 ),
               ),
               const SizedBox(height: 16),
@@ -288,3 +290,141 @@ class _PlayerLobbyCard extends StatelessWidget {
 }
 
 
+class _InviteFriendsSheet extends ConsumerStatefulWidget {
+  final String roomCode;
+  const _InviteFriendsSheet({required this.roomCode});
+
+  @override
+  ConsumerState<_InviteFriendsSheet> createState() => _InviteFriendsSheetState();
+}
+
+class _InviteFriendsSheetState extends ConsumerState<_InviteFriendsSheet> {
+  List<dynamic> _friends = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFriends();
+  }
+
+  Future<void> _fetchFriends() async {
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final token = await ref.read(authServiceProvider).getToken();
+      final response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/friends/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        setState(() => _friends = jsonDecode(response.body));
+      }
+    } catch (e) {
+      debugPrint("Error fetching friends: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _sendInvite(String friendId) async {
+    try {
+      final token = await ref.read(authServiceProvider).getToken();
+      final response = await http.post(
+        Uri.parse('${ApiService.baseUrl}/invites/send'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'friend_id': friendId,
+          'room_code': widget.roomCode,
+        }),
+      );
+      if (mounted) {
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invite sent!')));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send invite')));
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    
+    if (!authState.isAuthenticated) {
+      return Container(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Log in to invite friends directly!', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: 'Join my CYO game! Code: ${widget.roomCode}'));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invite code copied to clipboard!')),
+                );
+                Navigator.pop(context);
+              },
+              child: const Text('Copy Invite Code instead'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(24.0),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Invite Friends', style: TextStyle(color: AppTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
+              IconButton(icon: const Icon(Icons.close, color: AppTheme.textMuted), onPressed: () => Navigator.pop(context)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (_friends.isEmpty)
+            const Text('No friends found.', style: TextStyle(color: AppTheme.textMuted))
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _friends.length,
+                itemBuilder: (context, index) {
+                  final friend = _friends[index];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primaryRed,
+                      child: Text(friend['username'].substring(0, 2).toUpperCase(), style: const TextStyle(color: Colors.white)),
+                    ),
+                    title: Text(friend['username'], style: const TextStyle(color: AppTheme.textPrimary)),
+                    trailing: ElevatedButton(
+                      onPressed: () => _sendInvite(friend['id']),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
+                      child: const Text('Invite'),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

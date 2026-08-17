@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from contextlib import asynccontextmanager
 from core.database import get_db, engine, Base
-import models.room, models.user, models.title
+import models.room, models.user, models.title, models.account, models.friendship, models.invite
 from api.routes import api_router
 
 @asynccontextmanager
