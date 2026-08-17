@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/providers/auth_provider.dart';
 
 class HowItWorksScreen extends StatelessWidget {
   final bool isGuest;
@@ -83,10 +85,29 @@ class HowItWorksScreen extends StatelessWidget {
                   ),
                   SizedBox(
                     width: 120,
-                    child: PrimaryButton(
-                      text: 'Next',
-                      onPressed: () {
-                        context.push('/profile-creation', extra: {'isGuest': isGuest});
+                    child: Consumer(
+                      builder: (context, ref, child) {
+                        final authState = ref.watch(authProvider);
+                        
+                        return PrimaryButton(
+                          text: authState.isLoading && isGuest ? 'Joining...' : 'Next',
+                          onPressed: authState.isLoading ? () {} : () async {
+                            if (isGuest) {
+                              try {
+                                await ref.read(authProvider.notifier).registerGuest();
+                                if (context.mounted) context.go('/home');
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(e.toString())),
+                                  );
+                                }
+                              }
+                            } else {
+                              context.push('/profile-creation');
+                            }
+                          },
+                        );
                       },
                     ),
                   ),

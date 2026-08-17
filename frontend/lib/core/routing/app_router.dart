@@ -23,7 +23,11 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/how-it-works',
-      builder: (context, state) => const HowItWorksScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final isGuest = extra?['isGuest'] as bool? ?? false;
+        return HowItWorksScreen(isGuest: isGuest);
+      },
     ),
     GoRoute(
       path: '/profile-creation',

@@ -77,6 +77,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       throw e;
     }
   }
+  Future<void> registerGuest() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _authService.registerGuest();
+      final userData = await _authService.getMe();
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: true,
+        user: userData,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString().replaceAll('Exception: ', ''),
+      );
+      throw e;
+    }
+  }
 
   Future<void> login(String username, String password) async {
     state = state.copyWith(isLoading: true, error: null);
