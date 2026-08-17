@@ -110,6 +110,21 @@ class _InGameScreenState extends ConsumerState<InGameScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        leadingWidth: 80,
+        leading: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceCharcoal,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF2A2A2A)),
+            ),
+            child: Text(
+              gameState.luckPlay ? '🍀 LUCK' : '⚖️ FAIR',
+              style: const TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
         title: phase != 'TITLE_CREATION'
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),

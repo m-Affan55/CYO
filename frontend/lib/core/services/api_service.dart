@@ -10,7 +10,7 @@ class ApiService {
     return 'http://127.0.0.1:8000/api';
   }
 
-  Future<Map<String, dynamic>> createRoom(String hostName, String hostColor, int maxPlayers, int rounds, int timer, bool secretMode) async {
+  Future<Map<String, dynamic>> createRoom(String hostName, String hostColor, int maxPlayers, int rounds, int timer, bool secretMode, bool luckPlay) async {
     final response = await http.post(
       Uri.parse('$baseUrl/rooms/create'),
       headers: {'Content-Type': 'application/json'},
@@ -21,6 +21,7 @@ class ApiService {
         'rounds': rounds,
         'timer': timer,
         'secret_mode': secretMode,
+        'luck_play': luckPlay,
       }),
     );
 

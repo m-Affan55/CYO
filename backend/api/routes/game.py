@@ -350,6 +350,7 @@ async def handle_start_game(data: dict, room_id: str, user_id: str):
         max_rounds    = room.rounds
         timer_duration = room.timer
         secret_mode   = room.secret_mode
+        luck_play     = room.luck_play
 
         users_res = await db.execute(
             select(User).where(User.room_id == room_id, User.is_connected == True)
@@ -369,13 +370,14 @@ async def handle_start_game(data: dict, room_id: str, user_id: str):
         await db.commit()
 
     engine.init_game(room_id, user_ids, max_rounds=max_rounds,
-                     timer=timer_duration, secret_mode=secret_mode)
+                     timer=timer_duration, secret_mode=secret_mode, luck_play=luck_play)
 
     # BUG-12: Include secret_mode in GAME_STARTED so all clients know
     await manager.broadcast_to_room(room_id, {
         "event": "GAME_STARTED",
         "secret_mode": secret_mode,
         "rounds": max_rounds,
+        "luck_play": luck_play,
     })
     await broadcast_state(room_id)
 

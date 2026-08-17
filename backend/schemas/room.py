@@ -8,6 +8,7 @@ class RoomBase(BaseModel):
     rounds: int = Field(default=3, ge=1, le=10)
     timer: int = Field(default=30, ge=10, le=60)
     secret_mode: bool = Field(default=False)
+    luck_play: bool = Field(default=True)
 
 class RoomCreate(RoomBase):
     host_name: str = Field(..., min_length=1, max_length=20)

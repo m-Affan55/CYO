@@ -10,7 +10,7 @@ class GameEngine:
         # room_id -> game_state dict
         self.games: Dict[str, Dict[str, Any]] = {}
 
-    def init_game(self, room_id: str, users: list, max_rounds: int = 3, timer: int = 30, secret_mode: bool = False):
+    def init_game(self, room_id: str, users: list, max_rounds: int = 3, timer: int = 30, secret_mode: bool = False, luck_play: bool = True):
         """Initialize a brand-new game for a room."""
         self.games[room_id] = {
             "phase": "TITLE_CREATION",
@@ -24,8 +24,11 @@ class GameEngine:
             "max_rounds": max_rounds,
             "timer": timer,
             "secret_mode": secret_mode,
+            "luck_play": luck_play,
             "used_titles": [],
             "assigned_this_round": [],
+            "targeted_this_round": [],
+            "turn_pairs": [],
             # BUG-1: guards zombie voting timers
             "voting_id": None,
             # BUG-15: guards zombie selection timers
@@ -62,6 +65,15 @@ class GameEngine:
         # Clean up their assignment history so round math stays correct
         if user_id in state["assigned_this_round"]:
             state["assigned_this_round"].remove(user_id)
+        if user_id in state.get("targeted_this_round", []):
+            state["targeted_this_round"].remove(user_id)
+        
+        # Clean up fair-play pairs
+        if not state.get("luck_play", True):
+            state["turn_pairs"] = [
+                (a, t) for (a, t) in state.get("turn_pairs", [])
+                if a != user_id and t != user_id
+            ]
 
         # Remove any vote they already cast (doesn't matter much but keeps state clean)
         state["votes"].pop(user_id, None)
@@ -105,6 +117,14 @@ class GameEngine:
         state["titles"].append({"author_id": user_id, "text": title_stripped})
         return {"success": True}
 
+    def _generate_turn_pairs(self, players: list) -> list:
+        shuffled = list(players)
+        random.shuffle(shuffled)
+        n = len(shuffled)
+        if n < 2:
+            return []
+        return [(shuffled[i], shuffled[(i + 1) % n]) for i in range(n)]
+
     # ─── Assigner / target selection ─────────────────────────────────────────
 
     def select_assigner(self, room_id: str) -> Optional[str]:
@@ -112,31 +132,55 @@ class GameEngine:
         if not state:
             return None
 
-        available = [p for p in state["players"] if p not in state["assigned_this_round"]]
-        if not available:
-            # BUG-9: Don't fall back to full list — this means the round is over
-            logger.warning(f"select_assigner: no available players in room {room_id}, all assigned.")
-            return None
+        if state.get("luck_play", True):
+            available = [p for p in state["players"] if p not in state["assigned_this_round"]]
+            if not available:
+                # BUG-9: Don't fall back to full list — this means the round is over
+                logger.warning(f"select_assigner: no available players in room {room_id}, all assigned.")
+                return None
 
-        assigner_id = random.choice(available)
-        state["assigner_id"] = assigner_id
-        state["assigned_this_round"].append(assigner_id)
-        state["phase"] = "SELECTING_TARGET"
-        state["turn"] += 1
-        return assigner_id
+            assigner_id = random.choice(available)
+            state["assigner_id"] = assigner_id
+            state["assigned_this_round"].append(assigner_id)
+            state["phase"] = "SELECTING_TARGET"
+            state["turn"] += 1
+            return assigner_id
+        else:
+            if not state.get("turn_pairs"):
+                # Missing pairs usually means round is over, or first turn needs generation (handled in force start / next_round)
+                # But let's generate if empty and round 1 just started (safeguard)
+                if len(state["assigned_this_round"]) == 0:
+                    state["turn_pairs"] = self._generate_turn_pairs(state["players"])
+                if not state.get("turn_pairs"):
+                    return None
+            
+            assigner_id, target_id = state["turn_pairs"].pop(0)
+            state["assigner_id"] = assigner_id
+            state["target_id"] = target_id
+            state["assigned_this_round"].append(assigner_id)
+            state["targeted_this_round"].append(target_id)
+            state["phase"] = "SELECTING_TARGET"
+            state["turn"] += 1
+            return assigner_id
 
     def select_target(self, room_id: str) -> Optional[str]:
         state = self.games.get(room_id)
         if not state:
             return None
 
-        assigner_id = state.get("assigner_id")
-        possible_targets = [p for p in state["players"] if p != assigner_id]
-        if not possible_targets:
-            return None
+        if state.get("luck_play", True):
+            assigner_id = state.get("assigner_id")
+            possible_targets = [p for p in state["players"] if p != assigner_id]
+            if not possible_targets:
+                return None
 
-        target_id = random.choice(possible_targets)
-        state["target_id"] = target_id
+            target_id = random.choice(possible_targets)
+            state["target_id"] = target_id
+        else:
+            target_id = state.get("target_id")
+            if not target_id:
+                return None
+
         state["phase"] = "TITLE_SELECTION"
 
         # BUG-15: Generate a new selection_timer_id every time we enter TITLE_SELECTION
@@ -231,6 +275,9 @@ class GameEngine:
                 return False
             state["round"] = current_round + 1
             state["assigned_this_round"] = []
+            if not state.get("luck_play", True):
+                state["targeted_this_round"] = []
+                state["turn_pairs"] = self._generate_turn_pairs(state["players"])
             state["turn"] = 0
 
         return True
@@ -320,6 +367,8 @@ class GameEngine:
         state["round"]              = 1
         state["used_titles"]        = []
         state["assigned_this_round"] = []
+        state["targeted_this_round"] = []
+        state["turn_pairs"]         = []
         state["voting_id"]          = None
         state["selection_timer_id"] = None
         state["last_results"]       = None

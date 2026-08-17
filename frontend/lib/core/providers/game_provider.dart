@@ -45,6 +45,8 @@ class GameState {
   // BUG-12: secret_mode from server
   final bool secretMode;
 
+  final bool luckPlay;
+
   // BUG-13: actual max players from room settings
   final int maxPlayers;
 
@@ -63,6 +65,7 @@ class GameState {
     this.engineState,
     this.typingPlayers = const [],
     this.secretMode = false,
+    this.luckPlay = true,
     this.maxPlayers = 12,
     this.isAborted = false,
     this.abortMessage = '',
@@ -78,6 +81,7 @@ class GameState {
     Map<String, dynamic>? engineState,
     List<String>? typingPlayers,
     bool? secretMode,
+    bool? luckPlay,
     int? maxPlayers,
     bool? isAborted,
     String? abortMessage,
@@ -92,6 +96,7 @@ class GameState {
       engineState: engineState ?? this.engineState,
       typingPlayers: typingPlayers ?? this.typingPlayers,
       secretMode: secretMode ?? this.secretMode,
+      luckPlay: luckPlay ?? this.luckPlay,
       maxPlayers: maxPlayers ?? this.maxPlayers,
       isAborted: isAborted ?? this.isAborted,
       abortMessage: abortMessage ?? this.abortMessage,
@@ -153,7 +158,8 @@ class GameStateNotifier extends StateNotifier<GameState> {
         // BUG-12: Capture secret_mode from server for all clients
         final secretMode = event['secret_mode'] as bool? ?? false;
         final requiredTitles = event['rounds'] as int? ?? 1;
-        state = state.copyWith(status: 'PLAYING', secretMode: secretMode, requiredTitles: requiredTitles);
+        final luckPlay = event['luck_play'] as bool? ?? true;
+        state = state.copyWith(status: 'PLAYING', secretMode: secretMode, requiredTitles: requiredTitles, luckPlay: luckPlay);
         break;
 
       case 'TITLE_ADDED':
