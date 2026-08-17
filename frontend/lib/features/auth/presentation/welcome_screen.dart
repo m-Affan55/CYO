@@ -90,19 +90,32 @@ class WelcomeScreen extends StatelessWidget {
               // Buttons
               ElevatedButton(
                 onPressed: () {
-                  context.push('/how-it-works');
+                  context.push('/how-it-works', extra: {'isGuest': false});
                 },
                 child: const Text('Get Started'),
               ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
-                  // Navigate to Login
+                  context.push('/login');
                 },
                 child: Text(
                   'Already have an account? Log In',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  context.push('/how-it-works', extra: {'isGuest': true});
+                },
+                child: Text(
+                  'Play as Guest',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textMuted,
+                    decoration: TextDecoration.underline,
                   ),
                 ),
               ),

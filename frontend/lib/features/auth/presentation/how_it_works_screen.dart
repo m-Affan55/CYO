@@ -4,7 +4,8 @@ import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
 
 class HowItWorksScreen extends StatelessWidget {
-  const HowItWorksScreen({super.key});
+  final bool isGuest;
+  const HowItWorksScreen({super.key, this.isGuest = false});
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +86,7 @@ class HowItWorksScreen extends StatelessWidget {
                     child: PrimaryButton(
                       text: 'Next',
                       onPressed: () {
-                        context.push('/profile-creation');
+                        context.push('/profile-creation', extra: {'isGuest': isGuest});
                       },
                     ),
                   ),

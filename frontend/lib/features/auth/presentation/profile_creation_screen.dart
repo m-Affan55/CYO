@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/primary_button.dart';
+import 'package:frontend/core/providers/auth_provider.dart';
 
-class ProfileCreationScreen extends StatefulWidget {
-  const ProfileCreationScreen({super.key});
+class ProfileCreationScreen extends ConsumerStatefulWidget {
+  final bool isGuest;
+  const ProfileCreationScreen({super.key, this.isGuest = false});
 
   @override
-  State<ProfileCreationScreen> createState() => _ProfileCreationScreenState();
+  ConsumerState<ProfileCreationScreen> createState() => _ProfileCreationScreenState();
 }
 
-class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
+class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _statusController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   
   final List<Color> _avatarColors = [
     AppTheme.primaryRed,
@@ -29,11 +37,50 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   void dispose() {
     _usernameController.dispose();
     _statusController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+  
+  void _submit() async {
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username is required')));
+      return;
+    }
+    
+    if (!widget.isGuest) {
+      if (_passwordController.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password is required')));
+        return;
+      }
+      if (_passwordController.text != _confirmPasswordController.text) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+        return;
+      }
+      
+      try {
+        final colorHex = '#${_avatarColors[_selectedColorIndex].value.toRadixString(16).substring(2).toUpperCase()}';
+        await ref.read(authProvider.notifier).register(
+          username, 
+          _passwordController.text, 
+          colorHex, 
+          _statusController.text.isEmpty ? null : _statusController.text
+        );
+        if (mounted) context.go('/home');
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } else {
+      // Guest mode - just go home, maybe save locally if needed later
+      context.go('/home');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -48,7 +95,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'STEP 3 OF 3',
+                widget.isGuest ? 'GUEST SETUP' : 'STEP 3 OF 3',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   letterSpacing: 2,
                   color: AppTheme.primaryRed,
@@ -101,21 +148,19 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_avatarColors.length, (index) {
-                  final isSelected = _selectedColorIndex == index;
+                  final isSelected = index == _selectedColorIndex;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedColorIndex = index;
-                      });
-                    },
+                    onTap: () => setState(() => _selectedColorIndex = index),
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      width: 32,
-                      height: 32,
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      width: isSelected ? 32 : 24,
+                      height: isSelected ? 32 : 24,
                       decoration: BoxDecoration(
                         color: _avatarColors[index],
                         shape: BoxShape.circle,
-                        border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+                        border: isSelected
+                            ? Border.all(color: Colors.white, width: 2)
+                            : null,
                       ),
                     ),
                   );
@@ -176,13 +221,77 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                   ),
                 ),
               ),
+              
+              if (!widget.isGuest) ...[
+                const SizedBox(height: 24),
+                Text(
+                  'PASSWORD',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppTheme.surfaceCharcoal,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: AppTheme.textMuted,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'CONFIRM PASSWORD',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppTheme.surfaceCharcoal,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        color: AppTheme.textMuted,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              
               const SizedBox(height: 48),
               
               PrimaryButton(
-                text: 'Continue',
-                onPressed: () {
-                  context.go('/home');
-                },
+                text: authState.isLoading ? 'Creating Profile...' : 'Continue',
+                onPressed: authState.isLoading ? () {} : _submit,
               ),
             ],
           ),
