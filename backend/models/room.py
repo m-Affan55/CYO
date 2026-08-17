@@ -20,6 +20,7 @@ class Room(Base):
     rounds = Column(Integer, default=3)
     timer = Column(Integer, default=30)
     secret_mode = Column(Boolean, default=False)
+    luck_play = Column(Boolean, default=True)
     
     # Current Game State
     current_round = Column(Integer, default=0)

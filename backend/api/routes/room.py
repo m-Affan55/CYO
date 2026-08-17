@@ -34,6 +34,7 @@ async def create_room(room_in: RoomCreate, db: AsyncSession = Depends(get_db)):
         rounds=room_in.rounds,
         timer=room_in.timer,
         secret_mode=room_in.secret_mode,
+        luck_play=room_in.luck_play,
         status=RoomStatus.WAITING
     )
     db.add(new_room)

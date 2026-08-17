@@ -19,6 +19,7 @@ class _CreateGameScreenState extends ConsumerState<CreateGameScreen> {
   int _selectedRounds = 3;
   int _selectedTimer = 15;
   bool _isSecretMode = false;
+  bool _luckPlay = true;
 
   final List<int> _roundOptions = [1, 2, 3, 5];
   final List<int> _timerOptions = [10, 15, 20];
@@ -269,6 +270,51 @@ class _CreateGameScreenState extends ConsumerState<CreateGameScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              
+              // Luck Play Toggle
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceCharcoal,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _luckPlay ? AppTheme.primaryRed : const Color(0xFF2A2A2A)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _luckPlay ? '🍀 LUCK PLAY [ON]' : '⚖️ LUCK PLAY [OFF]',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: _luckPlay ? AppTheme.primaryRed : AppTheme.textPrimary,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _luckPlay 
+                              ? 'Random targeting — anyone can be picked multiple times. Pure chaos!' 
+                              : 'Fair mode — everyone assigns and receives a title exactly once per round.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _luckPlay,
+                      activeColor: AppTheme.primaryRed,
+                      onChanged: (val) => setState(() => _luckPlay = val),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 48),
 
               // Action Buttons
@@ -286,7 +332,8 @@ class _CreateGameScreenState extends ConsumerState<CreateGameScreen> {
                       _maxPlayers, 
                       _selectedRounds, 
                       _selectedTimer, 
-                      _isSecretMode
+                      _isSecretMode,
+                      _luckPlay
                     );
                     
                     // BUG-7 & BUG-8: Reset any stale game state and close old WebSocket
