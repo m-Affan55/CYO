@@ -122,12 +122,11 @@ async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends
 
 @router.post("/reset-password")
 async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
-    from core.security import verify_password
+    from core.security import verify_password, SECRET_KEY, ALGORITHM
     import jwt
-    from core.config import settings
     
     try:
-        payload = jwt.decode(req.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(req.token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         token_type: str = payload.get("type")
         if email is None or token_type != "reset":
