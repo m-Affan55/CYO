@@ -21,12 +21,13 @@ class AuthService {
     await prefs.remove(_tokenKey);
   }
 
-  Future<Map<String, dynamic>> register(String username, String password, String color, String? status) async {
+  Future<Map<String, dynamic>> register(String username, String email, String password, String color, String? status) async {
     final response = await http.post(
       Uri.parse('${ApiService.baseUrl}/auth/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'username': username,
+        'email': email,
         'password': password,
         'color': color,
         'status': status,
@@ -56,12 +57,12 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> login(String username, String password) async {
+  Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
       Uri.parse('${ApiService.baseUrl}/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'username': username,
+        'email': email,
         'password': password,
       }),
     );
@@ -91,6 +92,31 @@ class AuthService {
       return jsonDecode(response.body);
     } else {
       throw Exception('Failed to fetch profile: ${response.body}');
+    }
+  }
+
+  Future<void> requestPasswordReset(String email) async {
+    final response = await http.post(
+      Uri.parse('${ApiService.baseUrl}/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to request reset: ${response.body}');
+    }
+  }
+
+  Future<void> resetPassword(String token, String newPassword) async {
+    final response = await http.post(
+      Uri.parse('${ApiService.baseUrl}/auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'token': token,
+        'new_password': newPassword,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reset password: ${response.body}');
     }
   }
 }

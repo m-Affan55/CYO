@@ -13,29 +13,29 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _login() async {
-    if (_usernameController.text.trim().isEmpty || _passwordController.text.isEmpty) {
+    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter username and password')),
+        const SnackBar(content: Text('Please enter email and password')),
       );
       return;
     }
 
     try {
       await ref.read(authProvider.notifier).login(
-        _usernameController.text.trim(),
+        _emailController.text.trim(),
         _passwordController.text,
       );
       if (mounted) {
@@ -59,7 +59,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         title: const Text('Log In'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
       ),
       body: SafeArea(
@@ -77,15 +83,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'USERNAME',
+                'EMAIL',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: AppTheme.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
-                controller: _usernameController,
+                controller: _emailController,
                 decoration: InputDecoration(
+                  hintText: 'e.g. owl@example.com',
                   filled: true,
                   fillColor: AppTheme.surfaceCharcoal,
                   border: OutlineInputBorder(
@@ -123,6 +130,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       });
                     },
                   ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => context.push('/forgot-password'),
+                  child: const Text('Forgot Password?', style: TextStyle(color: AppTheme.primaryRed)),
                 ),
               ),
               const Spacer(),
