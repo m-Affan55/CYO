@@ -9,6 +9,7 @@ class Account(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)
     password_hash = Column(String, nullable=False)
     color = Column(String, default="#FFFFFF")
     status = Column(String, nullable=True)

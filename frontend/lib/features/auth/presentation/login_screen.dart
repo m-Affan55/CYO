@@ -125,6 +125,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => context.push('/forgot-password'),
+                  child: const Text('Forgot Password?', style: TextStyle(color: AppTheme.primaryRed)),
+                ),
+              ),
               const Spacer(),
               PrimaryButton(
                 text: authState.isLoading ? 'Logging in...' : 'Log In',

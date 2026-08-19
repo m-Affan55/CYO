@@ -7,9 +7,17 @@ from core.database import get_db
 from models.account import Account
 from schemas.auth import AccountCreate, AccountLogin, AccountResponse, Token, AccountUpdate
 from core.security import get_password_hash, verify_password, create_access_token
+from datetime import timedelta
 from api.dependencies import get_current_account
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 @router.post("/register", response_model=Token)
 async def register(user_in: AccountCreate, db: AsyncSession = Depends(get_db)):
@@ -21,6 +29,7 @@ async def register(user_in: AccountCreate, db: AsyncSession = Depends(get_db)):
     hashed_password = get_password_hash(user_in.password)
     new_account = Account(
         username=user_in.username,
+        email=user_in.email,
         password_hash=hashed_password,
         color=user_in.color,
         status=user_in.status
@@ -91,3 +100,46 @@ async def update_profile(update_data: AccountUpdate, db: AsyncSession = Depends(
     await db.commit()
     await db.refresh(current_account)
     return current_account
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Account).where(Account.email == req.email))
+    account = result.scalar_one_or_none()
+    
+    if account:
+        # Generate 15-minute token
+        from core.security import create_access_token
+        from core.email import send_password_reset_email
+        reset_token = create_access_token(
+            data={"sub": account.email, "type": "reset"},
+            expires_delta=timedelta(minutes=15)
+        )
+        send_password_reset_email(account.email, reset_token)
+        
+    # Always return success to prevent email enumeration
+    return {"message": "If that email is registered, a password reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    from core.security import verify_password
+    import jwt
+    from core.config import settings
+    
+    try:
+        payload = jwt.decode(req.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        if email is None or token_type != "reset":
+            raise HTTPException(status_code=400, detail="Invalid token")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        
+    result = await db.execute(select(Account).where(Account.email == email))
+    account = result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    account.password_hash = get_password_hash(req.new_password)
+    await db.commit()
+    
+    return {"message": "Password reset successfully"}

@@ -15,6 +15,7 @@ class ProfileCreationScreen extends ConsumerStatefulWidget {
 
 class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
   final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _statusController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
@@ -63,6 +64,7 @@ class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
         final colorHex = '#${_avatarColors[_selectedColorIndex].value.toRadixString(16).substring(2).toUpperCase()}';
         await ref.read(authProvider.notifier).register(
           username, 
+          _emailController.text.trim(),
           _passwordController.text, 
           colorHex, 
           _statusController.text.isEmpty ? null : _statusController.text
@@ -180,6 +182,27 @@ class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
                 controller: _usernameController,
                 decoration: InputDecoration(
                   hintText: 'e.g. NightOwl99',
+                  hintStyle: const TextStyle(color: AppTheme.textMuted),
+                  filled: true,
+                  fillColor: AppTheme.surfaceCharcoal,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'EMAIL',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  hintText: 'e.g. owl@example.com',
                   hintStyle: const TextStyle(color: AppTheme.textMuted),
                   filled: true,
                   fillColor: AppTheme.surfaceCharcoal,

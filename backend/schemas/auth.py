@@ -11,6 +11,7 @@ class TokenData(BaseModel):
 
 class AccountCreate(BaseModel):
     username: str
+    email: str
     password: str
     color: str = "#FFFFFF"
     status: Optional[str] = None
@@ -22,6 +23,7 @@ class AccountLogin(BaseModel):
 class AccountResponse(BaseModel):
     id: UUID
     username: str
+    email: Optional[str] = None
     color: str
     status: Optional[str] = None
     points: int
@@ -31,5 +33,6 @@ class AccountResponse(BaseModel):
 
 class AccountUpdate(BaseModel):
     username: Optional[str] = None
+    email: Optional[str] = None
     color: Optional[str] = None
     status: Optional[str] = None
