@@ -17,7 +17,7 @@ class AccountCreate(BaseModel):
     status: Optional[str] = None
 
 class AccountLogin(BaseModel):
-    username: str
+    email: str
     password: str
 
 class AccountResponse(BaseModel):

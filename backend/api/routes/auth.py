@@ -71,10 +71,10 @@ async def register_guest(db: AsyncSession = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
-async def login(user_in: AccountLogin, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Account).where(Account.username == user_in.username))
+async def login(user_credentials: AccountLogin, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Account).where(Account.email == user_credentials.email))
     account = result.scalar_one_or_none()
-    if not account or not verify_password(user_in.password, account.password_hash):
+    if not account or not verify_password(user_credentials.password, account.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     
     access_token = create_access_token(data={"username": account.username})
